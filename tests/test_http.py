@@ -35,6 +35,7 @@ def test_people_continuous_scroll_and_quick_interaction(db):
             assert page.text.count("data-person-row") == 100
             assert "data-infinite-sentinel" in page.text
             assert "all 125 contacts" in page.text
+            assert page.text.count("action-slot-empty") == 100
 
             more = client.get("/people/rows?offset=100")
             assert more.status_code == 200
