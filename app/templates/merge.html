@@ -2,7 +2,7 @@
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="page-eyebrow"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#merge"></use></svg>Data quality</p>
+    <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#merge"></use></svg>Data quality</p>
     <h1>Merge review</h1>
     <p class="page-description">Compare uncertain matches side by side. Only deterministic matches are merged automatically.</p>
   </div>
@@ -30,13 +30,13 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label for="survivor-{{ c.id }}">Record to preserve</label>
     <select id="survivor-{{ c.id }}" name="survivor_id"><option value="{{ target.id }}">{{ target.display_name }}</option><option value="{{ source.id }}">{{ source.display_name }}</option></select>
-    <div class="actions"><button name="action" value="approve"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#check"></use></svg>Approve merge</button><button class="secondary" name="action" value="rejected">Not a match</button><button class="quiet" name="action" value="ignored">Decide later</button></div>
+    <div class="actions"><button name="action" value="approve"><svg class="icon"><use href="/static/icons.svg#check"></use></svg>Approve merge</button><button class="secondary" name="action" value="rejected">Not a match</button><button class="quiet" name="action" value="ignored">Decide later</button></div>
   </form>
 </section>
 {% else %}
 <section class="panel">
   <div class="empty-state">
-    <div><span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#check"></use></svg></span><h3>No pending candidates</h3><p>Your relationship records are reconciled and the review queue is clear.</p></div>
+    <div><span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#check"></use></svg></span><h3>No pending candidates</h3><p>Your relationship records are reconciled and the review queue is clear.</p></div>
   </div>
 </section>
 {% endfor %}

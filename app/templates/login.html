@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b1220">
   <title>Sign in · Constellation</title>
-  <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}" type="image/svg+xml">
-  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <main class="login-shell">
   <section class="panel login-card">
     <div class="login-brand">
-      <span class="brand-mark"><svg class="icon icon-xl"><use href="{{ url_for('static', path='icons.svg') }}#constellation"></use></svg></span>
+      <span class="brand-mark"><svg class="icon icon-xl"><use href="/static/icons.svg#constellation"></use></svg></span>
       <h1>Welcome to Constellation</h1>
       <p class="muted">Your private relationship workspace.</p>
     </div>
@@ -22,7 +22,7 @@
       <input id="password" name="password" type="password" required autofocus>
       <div class="actions"><button type="submit" style="width:100%">Sign in</button></div>
     </form>
-    <div class="notice"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#shield"></use></svg><span>Your relationship data stays on this private instance.</span></div>
+    <div class="notice"><svg class="icon"><use href="/static/icons.svg#shield"></use></svg><span>Your relationship data stays on this private instance.</span></div>
   </section>
 </main>
 </body>

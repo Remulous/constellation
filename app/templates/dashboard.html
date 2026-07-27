@@ -3,7 +3,7 @@
 <header class="page-header">
   <div>
     <p class="page-eyebrow">
-      <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#constellation"></use></svg>
+      <svg class="icon"><use href="/static/icons.svg#constellation"></use></svg>
       Your relationship orbit
     </p>
     <h1>Good to see you.</h1>
@@ -11,11 +11,11 @@
   </div>
   <div class="actions">
     <a class="button secondary" href="/people">
-      <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg>
+      <svg class="icon"><use href="/static/icons.svg#people"></use></svg>
       Browse people
     </a>
     <a class="button" href="/imports">
-      <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#upload"></use></svg>
+      <svg class="icon"><use href="/static/icons.svg#upload"></use></svg>
       Import contacts
     </a>
   </div>
@@ -23,27 +23,27 @@
 
 <div class="grid cards" aria-label="Relationship overview">
   <a class="card metric-card attention" href="/follow-ups">
-    <div class="metric-top"><span>Overdue</span><span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#alert"></use></svg></span></div>
+    <div class="metric-top"><span>Overdue</span><span class="metric-icon"><svg class="icon"><use href="/static/icons.svg#alert"></use></svg></span></div>
     <div class="metric">{{ overdue|length }}</div>
     <div class="metric-caption">Need a check-in</div>
   </a>
   <a class="card metric-card today" href="/follow-ups">
-    <div class="metric-top"><span>Due today</span><span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#clock"></use></svg></span></div>
+    <div class="metric-top"><span>Due today</span><span class="metric-icon"><svg class="icon"><use href="/static/icons.svg#clock"></use></svg></span></div>
     <div class="metric">{{ due_today|length }}</div>
     <div class="metric-caption">Ready for today</div>
   </a>
   <a class="card metric-card" href="/follow-ups">
-    <div class="metric-top"><span>This week</span><span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#calendar"></use></svg></span></div>
+    <div class="metric-top"><span>This week</span><span class="metric-icon"><svg class="icon"><use href="/static/icons.svg#calendar"></use></svg></span></div>
     <div class="metric">{{ due_week|length }}</div>
     <div class="metric-caption">Coming up soon</div>
   </a>
   <a class="card metric-card" href="/people?sort=followup">
-    <div class="metric-top"><span>No cadence</span><span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg></span></div>
+    <div class="metric-top"><span>No cadence</span><span class="metric-icon"><svg class="icon"><use href="/static/icons.svg#people"></use></svg></span></div>
     <div class="metric">{{ no_cadence }}</div>
     <div class="metric-caption">Not yet scheduled</div>
   </a>
   <a class="card metric-card {{ 'today' if pending else 'clean' }}" href="/merge-review">
-    <div class="metric-top"><span>Merge review</span><span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#merge"></use></svg></span></div>
+    <div class="metric-top"><span>Merge review</span><span class="metric-icon"><svg class="icon"><use href="/static/icons.svg#merge"></use></svg></span></div>
     <div class="metric">{{ pending }}</div>
     <div class="metric-caption">{{ "Awaiting a decision" if pending else "All clear" }}</div>
   </a>
@@ -56,7 +56,7 @@
         <p class="kicker">Priority queue</p>
         <h2>Needs attention</h2>
       </div>
-      <a class="section-link" href="/follow-ups">View all <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#arrow-right"></use></svg></a>
+      <a class="section-link" href="/follow-ups">View all <svg class="icon"><use href="/static/icons.svg#arrow-right"></use></svg></a>
     </div>
     {% if overdue or due_today or due_week %}
     <div class="attention-list">
@@ -66,7 +66,7 @@
         <span>
           <span class="person-name">{{ p.display_name }}</span>
           <span class="person-meta">
-            <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#building"></use></svg>
+            <svg class="icon"><use href="/static/icons.svg#building"></use></svg>
             <span>{{ p.current_organization or "No organization" }}</span>
           </span>
         </span>
@@ -84,7 +84,7 @@
     {% else %}
     <div class="empty-state">
       <div>
-        <span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#check"></use></svg></span>
+        <span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#check"></use></svg></span>
         <h3>You’re all caught up</h3>
         <p>Nothing is due in the next seven days. Your relationship queue is clear.</p>
       </div>
@@ -115,7 +115,7 @@
     {% else %}
     <div class="empty-state compact">
       <div>
-        <span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg></span>
+        <span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#people"></use></svg></span>
         <h3>No contacts yet</h3>
         <p>Start with a Google Contacts or LinkedIn import.</p>
       </div>

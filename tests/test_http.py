@@ -14,10 +14,11 @@ def test_mutation_requires_valid_csrf(db):
         with TestClient(app, base_url="https://testserver") as client:
             assert client.post("/tags", data={"name": "Nope"}).status_code == 422
             page = client.get("/tags")
+            assert 'href="/static/app.css"' in page.text
+            assert 'href="/static/icons.svg#tag"' in page.text
             token = re.search(r'name="csrf_token" value="([^"]+)"', page.text).group(1)
             response = client.post("/tags", data={"name": "VetBiz", "csrf_token": token}, follow_redirects=False)
             assert response.status_code == 303
             assert db.scalar(select(Tag).where(Tag.name == "VetBiz"))
     finally:
         app.dependency_overrides.clear()
-
