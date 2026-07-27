@@ -6,14 +6,17 @@
     <h1>People</h1>
     <p class="page-description">Search and scroll through all {{ total }} contacts without breaking your flow.</p>
   </div>
-  <a class="button" href="/imports"><svg class="icon"><use href="/static/icons.svg#upload"></use></svg>Import contacts</a>
+  <div class="actions">
+    <a class="button secondary" href="/export/google.csv"><svg class="icon"><use href="/static/icons.svg#download"></use></svg>Google export</a>
+    <a class="button" href="/imports"><svg class="icon"><use href="/static/icons.svg#upload"></use></svg>Import contacts</a>
+  </div>
 </header>
 
 <section class="panel filter-panel">
   <form class="filters" method="get">
     <div>
       <label for="q">Search</label>
-      <input id="q" name="q" value="{{ q }}" placeholder="Name, organization, title or email">
+      <input id="q" name="q" value="{{ q }}" placeholder="Name, organization, title, location or email">
     </div>
     <div>
       <label for="priority">Priority</label>
@@ -27,11 +30,34 @@
       <label for="sort">Sort</label>
       <select id="sort" name="sort">{% for v in ["name","organization","followup","recent"] %}<option value="{{ v }}" {{ "selected" if sort == v }}>{{ v|title }}</option>{% endfor %}</select>
     </div>
+    <div>
+      <label for="tag">Tag</label>
+      <select id="tag" name="tag"><option value="">All tags</option>{% for item in all_tags %}<option value="{{ item.name }}" {{ "selected" if tag == item.name }}>{{ item.name }}</option>{% endfor %}</select>
+    </div>
+    <div>
+      <label for="followup">Relationship timing</label>
+      <select id="followup" name="followup">
+        <option value="">Any timing</option>
+        {% for value, label in [("overdue","Overdue"),("today","Due today"),("upcoming","Upcoming 30 days"),("no_cadence","No cadence"),("never_contacted","Never contacted")] %}
+        <option value="{{ value }}" {{ "selected" if followup == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <div class="filter-actions">
       <button type="submit">Apply</button>
-      {% if q or priority or status or sort != "name" %}<a class="button secondary" href="/people">Clear</a>{% endif %}
+      {% if q or priority or status or tag or followup or sort != "name" %}<a class="button secondary" href="/people">Clear</a>{% endif %}
     </div>
   </form>
+  {% if q or priority or status or tag or followup or sort != "name" %}
+  <form class="save-segment-form" action="/segments" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="priority" value="{{ priority }}">
+    <input type="hidden" name="status" value="{{ status }}"><input type="hidden" name="tag" value="{{ tag }}">
+    <input type="hidden" name="followup" value="{{ followup }}"><input type="hidden" name="sort" value="{{ sort }}">
+    <label for="segment_name">Save this view</label>
+    <div><input id="segment_name" name="name" placeholder="e.g. High-priority founders" required><button class="secondary" type="submit">Save segment</button></div>
+  </form>
+  {% endif %}
 </section>
 
 <form method="post" action="/people/bulk" data-people-form>
@@ -61,7 +87,7 @@
             <div>
               <span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#people"></use></svg></span>
               <h3>No people found</h3>
-              <p>{{ "Try adjusting your search or filters." if q or priority or status else "Import contacts to begin building your relationship directory." }}</p>
+              <p>{{ "Try adjusting your search or filters." if q or priority or status or tag or followup else "Import contacts to begin building your relationship directory." }}</p>
             </div>
           </div>
         </td></tr>

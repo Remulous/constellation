@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block title %}Saved segments · Constellation{% endblock %}
+{% block content %}
+<header class="page-header"><div><p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#tag"></use></svg>Reusable views</p><h1>Saved segments</h1><p class="page-description">Return to useful slices of your network without rebuilding filters.</p></div><a class="button" href="/people">Build a segment</a></header>
+{% if rows %}<section class="segment-grid">{% for segment, count, url in rows %}
+<article class="card segment-card">
+  <div><span class="metric-icon"><svg class="icon"><use href="/static/icons.svg#people"></use></svg></span><h2>{{ segment.name }}</h2><p><strong>{{ count }}</strong> matching contact{{ "" if count == 1 else "s" }}</p></div>
+  <div class="segment-filters">{% for key, value in segment.filters.items() %}<span class="badge">{{ key|replace("_"," ")|title }}: {{ value|replace("_"," ")|title }}</span>{% else %}<span class="muted">All contacts</span>{% endfor %}</div>
+  <div class="actions"><a class="button small" href="{{ url }}">Open segment</a><form class="inline" method="post" action="/segments/{{ segment.id }}/delete"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button quiet small" type="submit">Delete</button></form></div>
+</article>{% endfor %}</section>
+{% else %}<section class="panel empty-state"><div><span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#tag"></use></svg></span><h3>No saved segments yet</h3><p>Filter the People directory, then give that view a name.</p><div class="actions"><a class="button" href="/people">Explore people</a></div></div></section>{% endif %}
+{% endblock %}

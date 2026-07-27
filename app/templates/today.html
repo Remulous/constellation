@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block title %}Today · Constellation{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#calendar"></use></svg>Daily relationship desk</p>
+    <h1>Today</h1>
+    <p class="page-description">{{ today.strftime("%A, %B %-d") }} · Focus on the relationships that need attention now.</p>
+  </div>
+  <a class="button secondary" href="/people"><svg class="icon"><use href="/static/icons.svg#people"></use></svg>Browse people</a>
+</header>
+
+<section class="today-summary">
+  <a class="card summary-tile attention" href="/people?followup=overdue"><strong>{{ due|length }}</strong><span>Due or overdue</span></a>
+  <a class="card summary-tile" href="/people?followup=upcoming"><strong>{{ upcoming|length }}</strong><span>Coming up this week</span></a>
+  <a class="card summary-tile" href="/merge-review"><strong>{{ pending_merges }}</strong><span>Merges to review</span></a>
+</section>
+
+<div class="today-grid">
+  <section class="panel">
+    <div class="panel-header"><div><p class="kicker">Act now</p><h2>Due and overdue</h2></div><a class="section-link" href="/follow-ups">All follow-ups →</a></div>
+    {% for person in due %}
+    <article class="today-person">
+      <a class="person-cell" href="/people/{{ person.id }}"><span class="avatar">{{ person.display_name[:2] }}</span><span><span class="cell-main">{{ person.display_name }}</span><span class="cell-sub">{{ person.current_organization or "No organization" }}</span></span></a>
+      <div class="due-label {{ 'overdue' if person.next_followup < today else 'today' }}"><strong>{{ "Overdue" if person.next_followup < today else "Today" }}</strong><small>{{ person.next_followup.strftime("%b %-d") }}</small></div>
+      <div class="row-actions">{% if person.linkedin_url %}<a class="button secondary small icon-only" href="{{ person.linkedin_url }}" target="_blank" rel="noopener" aria-label="Open LinkedIn"><svg class="icon"><use href="/static/icons.svg#linkedin"></use></svg></a>{% endif %}<a class="button secondary small" href="/people/{{ person.id }}/brief">Prepare</a><button class="button small" data-quick-interaction data-person-id="{{ person.id }}" data-person-name="{{ person.display_name }}">Log</button></div>
+    </article>
+    {% else %}<div class="empty-state compact"><div><span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#shield"></use></svg></span><h3>You’re caught up</h3><p>No relationships are due today.</p></div></div>{% endfor %}
+  </section>
+
+  <div class="stack">
+    <section class="panel">
+      <div class="panel-header"><div><p class="kicker">Next seven days</p><h2>Coming up</h2></div></div>
+      {% for person in upcoming %}<a class="contact-row" href="/people/{{ person.id }}"><span class="avatar">{{ person.display_name[:2] }}</span><span><span class="person-name">{{ person.display_name }}</span><span class="person-meta">{{ person.current_organization or "No organization" }}</span></span><span class="due-label"><strong>{{ person.next_followup.strftime("%a") }}</strong><small>{{ person.next_followup.strftime("%b %-d") }}</small></span></a>{% else %}<p class="muted">Nothing scheduled for the next seven days.</p>{% endfor %}
+    </section>
+    <section class="panel">
+      <div class="panel-header"><div><p class="kicker">Last seven days</p><h2>Recent momentum</h2></div></div>
+      {% for interaction, person in recent_rows %}<a class="recent-interaction" href="/people/{{ person.id }}"><span><strong>{{ person.display_name }}</strong><small>{{ interaction.interaction_type }} · {{ interaction.interaction_date.strftime("%b %-d") }}</small></span><span>{{ interaction.summary or "Interaction logged" }}</span></a>{% else %}<p class="muted">No interactions logged this week yet.</p>{% endfor %}
+    </section>
+  </div>
+</div>
+{% include "_quick_interaction_modal.html" %}
+{% endblock %}

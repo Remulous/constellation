@@ -22,6 +22,9 @@
 
     <nav class="primary-nav" aria-label="Primary navigation">
       <p class="nav-label">Workspace</p>
+      <a class="nav-item {{ 'active' if request.url.path == '/today' }}" href="/today" {{ 'aria-current="page"' if request.url.path == '/today' }}>
+        <svg class="icon"><use href="/static/icons.svg#calendar"></use></svg><span>Today</span>
+      </a>
       <a class="nav-item {{ 'active' if request.url.path == '/' }}" href="/" {{ 'aria-current="page"' if request.url.path == '/' }}>
         <svg class="icon"><use href="/static/icons.svg#dashboard"></use></svg><span>Dashboard</span>
       </a>
@@ -30,6 +33,9 @@
       </a>
       <a class="nav-item {{ 'active' if request.url.path.startswith('/follow-ups') }}" href="/follow-ups" {{ 'aria-current="page"' if request.url.path.startswith('/follow-ups') }}>
         <svg class="icon"><use href="/static/icons.svg#calendar"></use></svg><span>Follow-ups</span>
+      </a>
+      <a class="nav-item {{ 'active' if request.url.path.startswith('/segments') }}" href="/segments" {{ 'aria-current="page"' if request.url.path.startswith('/segments') }}>
+        <svg class="icon"><use href="/static/icons.svg#tag"></use></svg><span>Saved segments</span>
       </a>
 
       <p class="nav-label">Data</p>
@@ -42,6 +48,9 @@
       <a class="nav-item {{ 'active' if request.url.path.startswith('/tags') }}" href="/tags" {{ 'aria-current="page"' if request.url.path.startswith('/tags') }}>
         <svg class="icon"><use href="/static/icons.svg#tag"></use></svg><span>Tags</span>
       </a>
+      <a class="nav-item {{ 'active' if request.url.path.startswith('/data-quality') }}" href="/data-quality" {{ 'aria-current="page"' if request.url.path.startswith('/data-quality') }}>
+        <svg class="icon"><use href="/static/icons.svg#shield"></use></svg><span>Data quality</span>
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -50,6 +59,9 @@
       </a>
       <a class="nav-item" href="/export.csv">
         <svg class="icon"><use href="/static/icons.svg#download"></use></svg><span>Export CSV</span>
+      </a>
+      <a class="nav-item" href="/export/google.csv">
+        <svg class="icon"><use href="/static/icons.svg#download"></use></svg><span>Google Contacts</span>
       </a>
       <form action="/logout" method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
