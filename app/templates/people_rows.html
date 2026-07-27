@@ -16,7 +16,11 @@
   </td>
   <td class="wide-cell" data-label="Tags">{% for tag in p.tags %}<span class="badge">{{ tag.name }}</span>{% else %}<span class="subtle">—</span>{% endfor %}</td>
   <td data-label="Action">
-    <button class="button secondary small" type="button" data-quick-interaction data-person-id="{{ p.id }}" data-person-name="{{ p.display_name }}">Log interaction</button>
+    <div class="row-actions">
+      {% if p.linkedin_url %}<a class="button secondary small icon-only" target="_blank" rel="noopener" href="{{ p.linkedin_url }}" aria-label="Open {{ p.display_name }} on LinkedIn" title="Open LinkedIn"><svg class="icon"><use href="/static/icons.svg#linkedin"></use></svg></a>{% endif %}
+      <a class="button secondary small icon-only" href="/people/{{ p.id }}/brief" aria-label="Prepare for a meeting with {{ p.display_name }}" title="Meeting brief"><svg class="icon"><use href="/static/icons.svg#note"></use></svg></a>
+      <button class="button secondary small" type="button" data-quick-interaction data-person-id="{{ p.id }}" data-person-name="{{ p.display_name }}">Log</button>
+    </div>
   </td>
 </tr>
 {% endfor %}

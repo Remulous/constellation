@@ -74,6 +74,13 @@ class Person(Base):
     interactions: Mapped[list["Interaction"]] = relationship(cascade="all, delete-orphan")
     tags: Mapped[list["Tag"]] = relationship(secondary=person_tags, back_populates="people")
 
+    @property
+    def linkedin_url(self) -> str | None:
+        for identity in self.identities:
+            if identity.provider == Provider.LINKEDIN.value and identity.profile_url and identity.active:
+                return identity.profile_url
+        return None
+
 
 class ExternalIdentity(Base):
     __tablename__ = "external_identities"
@@ -186,3 +193,12 @@ class MergeHistory(Base):
     snapshot: Mapped[dict] = mapped_column(JSON)
     merged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SavedSegment(Base):
+    __tablename__ = "saved_segments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    filters: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

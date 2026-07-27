@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block title %}Brief: {{ person.display_name }} · Constellation{% endblock %}
+{% block content %}
+<div class="brief-actions">
+  <a class="button quiet" href="/people/{{ person.id }}">← Back to {{ person.display_name }}</a>
+  <button class="button secondary" type="button" data-print><svg class="icon"><use href="/static/icons.svg#download"></use></svg>Print or save PDF</button>
+</div>
+<article class="meeting-brief">
+  <header class="brief-header">
+    <div><p class="page-eyebrow">Meeting preparation brief</p><h1>{{ person.display_name }}</h1><p>{{ person.current_title or "Role not recorded" }}{% if person.current_organization %} at {{ person.current_organization }}{% endif %}</p></div>
+    <div class="brief-date"><span>Prepared</span><strong>{{ today.strftime("%B %-d, %Y") }}</strong></div>
+  </header>
+  <section class="brief-facts">
+    <div><span>Status</span><strong>{{ person.relationship_status|title }} · {{ person.priority|title }} priority</strong></div>
+    <div><span>Last meaningful contact</span><strong>{{ person.last_meaningful_interaction.strftime("%B %-d, %Y") if person.last_meaningful_interaction else "Never recorded" }}</strong></div>
+    <div><span>Next follow-up</span><strong>{{ person.next_followup.strftime("%B %-d, %Y") if person.next_followup else "Not scheduled" }}</strong></div>
+    <div><span>Tags</span><strong>{{ person.tags|map(attribute="name")|join(", ") or "None" }}</strong></div>
+  </section>
+  {% if person.general_note %}<section class="brief-section"><p class="kicker">Relationship context</p><h2>What to remember</h2><p class="brief-note">{{ person.general_note }}</p></section>{% endif %}
+  <section class="brief-section"><p class="kicker">Conversation prompts</p><h2>Questions worth asking</h2><ol class="question-list">{% for question in questions %}<li>{{ question }}</li>{% endfor %}</ol></section>
+  <section class="brief-section"><p class="kicker">Recent history</p><h2>Last touchpoints</h2>{% for item in recent_interactions %}<div class="brief-interaction"><time>{{ item.interaction_date.strftime("%b %-d, %Y") }}</time><div><strong>{{ item.interaction_type }}</strong><p>{{ item.summary or "No summary recorded." }}</p></div></div>{% else %}<p class="muted">No interactions recorded yet.</p>{% endfor %}</section>
+</article>
+{% endblock %}

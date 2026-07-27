@@ -51,9 +51,15 @@ The boundary is deliberate:
 - Due, overdue, and upcoming follow-up views
 - Meaningful interaction logging and follow-up recalculation
 - Quick interaction logging from People and Follow-ups
+- A focused Today view for due relationships, upcoming follow-ups, and recent momentum
+- Printable meeting-preparation briefs with relationship context and conversation prompts
+- Saved People segments with reusable search, tag, status, priority, and timing filters
+- Data-quality center for missing contact details, context, tags, and cadence
+- One-click LinkedIn shortcuts from contact lists and profiles
 - Manual scheduling, snoozing, cadence pausing in the data model, and archiving
 - Obsidian URI storage and helper endpoint
 - CSV export with spreadsheet-formula-injection protection
+- Google Contacts-compatible CSV export that preserves LinkedIn URLs, labels, notes, and CRM metadata
 - Optional Argon2 password authentication and CSRF protection
 - Optional bearer-protected, read-only ChatGPT MCP connector
 - Field-by-field merge decisions and one-click undo for new merges

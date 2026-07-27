@@ -5,7 +5,7 @@ import io
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlsplit
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
@@ -26,6 +26,7 @@ from app.models import (
     MergeCandidate,
     MergeHistory,
     Person,
+    SavedSegment,
     Tag,
 )
 from app.security import csrf_token, safe_csv_cell, verify_csrf, verify_password
@@ -34,6 +35,7 @@ from app.services.imports import import_csv
 
 BASE = Path(__file__).parent
 PEOPLE_BATCH_SIZE = 100
+SEGMENT_FILTER_KEYS = ("q", "priority", "status", "tag", "followup", "sort")
 MERGE_FIELDS = (
     "display_name", "primary_email", "primary_phone", "current_organization",
     "current_title", "location", "priority", "relationship_status",
@@ -143,35 +145,109 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     ))
 
 
-@app.get("/people", response_class=HTMLResponse)
-def people(
-    request: Request, q: str = "", priority: str = "", status: str = "",
-    sort: str = "name", db: Session = Depends(get_db),
-):
-    stmt, order = people_statement(q, priority, status, sort)
-    total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
-    rows = db.scalars(stmt.order_by(*order).limit(PEOPLE_BATCH_SIZE + 1)).all()
-    has_next = len(rows) > PEOPLE_BATCH_SIZE
-    next_url = people_rows_url(q, priority, status, sort, PEOPLE_BATCH_SIZE) if has_next else ""
-    all_tags = db.scalars(select(Tag).order_by(Tag.name)).all()
-    return templates.TemplateResponse("people.html", context(
-        request, people=rows[:PEOPLE_BATCH_SIZE], q=q, priority=priority, status=status,
-        sort=sort, total=total, next_url=next_url, all_tags=all_tags, today=date.today(),
+@app.get("/today", response_class=HTMLResponse)
+def today_page(request: Request, db: Session = Depends(get_db)):
+    today = date.today()
+    active = [Person.archived_at.is_(None), Person.cadence_paused.is_(False)]
+    due = db.scalars(
+        select(Person)
+        .where(*active, Person.next_followup <= today)
+        .options(selectinload(Person.identities))
+        .order_by(Person.next_followup, Person.display_name)
+    ).all()
+    upcoming = db.scalars(
+        select(Person)
+        .where(
+            *active,
+            Person.next_followup > today,
+            Person.next_followup <= today + timedelta(days=7),
+        )
+        .options(selectinload(Person.identities))
+        .order_by(Person.next_followup, Person.display_name)
+    ).all()
+    recent_rows = db.execute(
+        select(Interaction, Person)
+        .join(Person, Interaction.person_id == Person.id)
+        .where(
+            Person.archived_at.is_(None),
+            Interaction.interaction_date >= today - timedelta(days=7),
+        )
+        .order_by(Interaction.interaction_date.desc(), Interaction.id.desc())
+        .limit(12)
+    ).all()
+    pending_merges = db.scalar(
+        select(func.count()).select_from(MergeCandidate).where(MergeCandidate.status == "pending")
+    ) or 0
+    return templates.TemplateResponse("today.html", context(
+        request,
+        today=today,
+        due=due,
+        upcoming=upcoming,
+        recent_rows=recent_rows,
+        pending_merges=pending_merges,
+        now_date=today,
     ))
 
 
-def people_statement(q: str, priority: str, status: str, sort: str):
-    stmt = select(Person).where(Person.archived_at.is_(None)).options(selectinload(Person.tags))
+@app.get("/people", response_class=HTMLResponse)
+def people(
+    request: Request, q: str = "", priority: str = "", status: str = "",
+    tag: str = "", followup: str = "", sort: str = "name",
+    db: Session = Depends(get_db),
+):
+    stmt, order = people_statement(q, priority, status, tag, followup, sort)
+    total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
+    rows = db.scalars(stmt.order_by(*order).limit(PEOPLE_BATCH_SIZE + 1)).all()
+    has_next = len(rows) > PEOPLE_BATCH_SIZE
+    next_url = people_rows_url(
+        q, priority, status, tag, followup, sort, PEOPLE_BATCH_SIZE
+    ) if has_next else ""
+    all_tags = db.scalars(select(Tag).order_by(Tag.name)).all()
+    return templates.TemplateResponse("people.html", context(
+        request, people=rows[:PEOPLE_BATCH_SIZE], q=q, priority=priority, status=status,
+        tag=tag, followup=followup, sort=sort, total=total, next_url=next_url,
+        all_tags=all_tags, today=date.today(),
+    ))
+
+
+def people_statement(
+    q: str,
+    priority: str,
+    status: str,
+    tag: str,
+    followup: str,
+    sort: str,
+):
+    today = date.today()
+    stmt = select(Person).where(Person.archived_at.is_(None)).options(
+        selectinload(Person.tags), selectinload(Person.identities)
+    )
     if q:
         term = f"%{q.strip()}%"
         stmt = stmt.where(or_(
             Person.display_name.ilike(term), Person.current_organization.ilike(term),
             Person.current_title.ilike(term), Person.primary_email.ilike(term),
+            Person.location.ilike(term),
         ))
     if priority:
         stmt = stmt.where(Person.priority == priority)
     if status:
         stmt = stmt.where(Person.relationship_status == status)
+    if tag:
+        stmt = stmt.join(Person.tags).where(Tag.name == tag)
+    if followup == "overdue":
+        stmt = stmt.where(Person.next_followup < today)
+    elif followup == "today":
+        stmt = stmt.where(Person.next_followup == today)
+    elif followup == "upcoming":
+        stmt = stmt.where(
+            Person.next_followup > today,
+            Person.next_followup <= today + timedelta(days=30),
+        )
+    elif followup == "no_cadence":
+        stmt = stmt.where(Person.followup_interval_days.is_(None))
+    elif followup == "never_contacted":
+        stmt = stmt.where(Person.last_meaningful_interaction.is_(None))
     order = {
         "name": (Person.display_name, Person.id),
         "organization": (Person.current_organization.asc().nullslast(), Person.display_name, Person.id),
@@ -181,25 +257,35 @@ def people_statement(q: str, priority: str, status: str, sort: str):
     return stmt, order
 
 
-def people_rows_url(q: str, priority: str, status: str, sort: str, offset: int) -> str:
+def people_rows_url(
+    q: str,
+    priority: str,
+    status: str,
+    tag: str,
+    followup: str,
+    sort: str,
+    offset: int,
+) -> str:
     return "/people/rows?" + urlencode({
-        "q": q, "priority": priority, "status": status, "sort": sort, "offset": offset,
+        "q": q, "priority": priority, "status": status, "tag": tag,
+        "followup": followup, "sort": sort, "offset": offset,
     })
 
 
 @app.get("/people/rows", response_class=HTMLResponse)
 def people_rows(
     request: Request, q: str = "", priority: str = "", status: str = "",
-    sort: str = "name", offset: int = 0, db: Session = Depends(get_db),
+    tag: str = "", followup: str = "", sort: str = "name",
+    offset: int = 0, db: Session = Depends(get_db),
 ):
     offset = max(0, offset)
-    stmt, order = people_statement(q, priority, status, sort)
+    stmt, order = people_statement(q, priority, status, tag, followup, sort)
     rows = db.scalars(
         stmt.order_by(*order).offset(offset).limit(PEOPLE_BATCH_SIZE + 1)
     ).all()
     has_next = len(rows) > PEOPLE_BATCH_SIZE
     next_url = people_rows_url(
-        q, priority, status, sort, offset + PEOPLE_BATCH_SIZE
+        q, priority, status, tag, followup, sort, offset + PEOPLE_BATCH_SIZE
     ) if has_next else ""
     return templates.TemplateResponse("people_rows.html", context(
         request, people=rows[:PEOPLE_BATCH_SIZE], next_url=next_url, today=date.today(),
@@ -252,6 +338,41 @@ def person_detail(request: Request, person_id: str, db: Session = Depends(get_db
     all_tags = db.scalars(select(Tag).order_by(Tag.name)).all()
     return templates.TemplateResponse("person.html", context(
         request, person=person, all_tags=all_tags, now_date=date.today(),
+    ))
+
+
+def meeting_brief_questions(person: Person, today: date) -> list[str]:
+    questions = []
+    if person.current_organization:
+        questions.append(f"What has changed at {person.current_organization} since we last spoke?")
+    if person.interactions:
+        latest = max(person.interactions, key=lambda item: (item.interaction_date, item.id))
+        if latest.summary:
+            questions.append(f"Follow up on: {latest.summary}")
+    if person.next_followup and person.next_followup <= today:
+        questions.append("What would make this reconnection useful for them right now?")
+    if not person.current_title:
+        questions.append("What are they focused on professionally now?")
+    if not person.general_note:
+        questions.append("What context or personal milestone should I remember for next time?")
+    return questions[:4] or ["What has changed since we last connected?", "How can I be useful?"]
+
+
+@app.get("/people/{person_id}/brief", response_class=HTMLResponse)
+def person_brief(request: Request, person_id: str, db: Session = Depends(get_db)):
+    person = get_person(db, person_id)
+    today = date.today()
+    recent_interactions = sorted(
+        person.interactions,
+        key=lambda item: (item.interaction_date, item.id),
+        reverse=True,
+    )[:5]
+    return templates.TemplateResponse("brief.html", context(
+        request,
+        person=person,
+        today=today,
+        recent_interactions=recent_interactions,
+        questions=meeting_brief_questions(person, today),
     ))
 
 
@@ -573,6 +694,178 @@ def add_tag(
     return RedirectResponse("/tags", status_code=303)
 
 
+def segment_filters(values: dict) -> dict:
+    filters = {
+        key: str(values.get(key, "")).strip()
+        for key in SEGMENT_FILTER_KEYS
+        if str(values.get(key, "")).strip()
+    }
+    if filters.get("sort") == "name":
+        filters.pop("sort")
+    return filters
+
+
+def segment_url(filters: dict) -> str:
+    return "/people" + (f"?{urlencode(filters)}" if filters else "")
+
+
+@app.get("/segments", response_class=HTMLResponse)
+def segments_page(request: Request, db: Session = Depends(get_db)):
+    segments = db.scalars(select(SavedSegment).order_by(SavedSegment.name)).all()
+    rows = []
+    for segment in segments:
+        filters = segment_filters(segment.filters or {})
+        stmt, _ = people_statement(
+            filters.get("q", ""),
+            filters.get("priority", ""),
+            filters.get("status", ""),
+            filters.get("tag", ""),
+            filters.get("followup", ""),
+            filters.get("sort", "name"),
+        )
+        count = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
+        rows.append((segment, count, segment_url(filters)))
+    return templates.TemplateResponse("segments.html", context(request, rows=rows))
+
+
+@app.post("/segments")
+def save_segment(
+    request: Request,
+    name: str = Form(...),
+    q: str = Form(""),
+    priority: str = Form(""),
+    status: str = Form(""),
+    tag: str = Form(""),
+    followup: str = Form(""),
+    sort: str = Form("name"),
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    clean_name = name.strip()
+    if not clean_name:
+        raise HTTPException(400, "Segment name is required")
+    filters = segment_filters({
+        "q": q,
+        "priority": priority,
+        "status": status,
+        "tag": tag,
+        "followup": followup,
+        "sort": sort,
+    })
+    existing = db.scalar(
+        select(SavedSegment).where(func.lower(SavedSegment.name) == clean_name.casefold())
+    )
+    if existing:
+        existing.filters = filters
+    else:
+        db.add(SavedSegment(name=clean_name, filters=filters))
+    db.commit()
+    return RedirectResponse("/segments", status_code=303)
+
+
+@app.post("/segments/{segment_id}/delete")
+def delete_segment(
+    request: Request,
+    segment_id: int,
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    segment = db.get(SavedSegment, segment_id)
+    if not segment:
+        raise HTTPException(404)
+    db.delete(segment)
+    db.commit()
+    return RedirectResponse("/segments", status_code=303)
+
+
+def valid_linkedin_url(value: str | None) -> bool:
+    if not value:
+        return False
+    parsed = urlsplit(value)
+    host = (parsed.hostname or "").lower()
+    return parsed.scheme in {"http", "https"} and (
+        host == "linkedin.com" or host.endswith(".linkedin.com")
+    )
+
+
+QUALITY_LABELS = {
+    "missing_email": ("Missing email", "No primary or imported email address"),
+    "missing_phone": ("Missing phone", "No primary or imported phone number"),
+    "missing_organization": ("Missing organization", "No current organization"),
+    "missing_linkedin": ("Missing LinkedIn", "No active LinkedIn profile URL"),
+    "invalid_linkedin": ("Invalid LinkedIn", "Profile URL does not point to LinkedIn"),
+    "never_contacted": ("Never contacted", "No meaningful interaction recorded"),
+    "no_tags": ("No tags", "Not included in any relationship group"),
+    "no_cadence": ("No cadence", "No recurring follow-up rhythm"),
+}
+
+
+def person_quality_issues(person: Person) -> list[str]:
+    method_types = {method.method_type for method in person.methods if method.value}
+    linkedin_identities = [
+        identity for identity in person.identities
+        if identity.provider == "linkedin" and identity.active
+    ]
+    issues = []
+    if not person.primary_email and "email" not in method_types:
+        issues.append("missing_email")
+    if not person.primary_phone and "phone" not in method_types:
+        issues.append("missing_phone")
+    if not person.current_organization:
+        issues.append("missing_organization")
+    if not linkedin_identities:
+        issues.append("missing_linkedin")
+    elif not any(valid_linkedin_url(identity.profile_url) for identity in linkedin_identities):
+        issues.append("invalid_linkedin")
+    if not person.last_meaningful_interaction:
+        issues.append("never_contacted")
+    if not person.tags:
+        issues.append("no_tags")
+    if not person.followup_interval_days:
+        issues.append("no_cadence")
+    return issues
+
+
+@app.get("/data-quality", response_class=HTMLResponse)
+def data_quality_page(
+    request: Request,
+    issue: str = "",
+    db: Session = Depends(get_db),
+):
+    people = db.scalars(
+        select(Person)
+        .where(Person.archived_at.is_(None))
+        .options(
+            selectinload(Person.methods),
+            selectinload(Person.identities),
+            selectinload(Person.tags),
+        )
+        .order_by(Person.display_name)
+    ).all()
+    issues_by_person = {person.id: person_quality_issues(person) for person in people}
+    counts = {
+        code: sum(code in issues for issues in issues_by_person.values())
+        for code in QUALITY_LABELS
+    }
+    selected = issue if issue in QUALITY_LABELS else ""
+    visible = [
+        person for person in people
+        if issues_by_person[person.id] and (
+            not selected or selected in issues_by_person[person.id]
+        )
+    ]
+    visible.sort(key=lambda person: (-len(issues_by_person[person.id]), person.display_name))
+    return templates.TemplateResponse("data_quality.html", context(
+        request,
+        counts=counts,
+        labels=QUALITY_LABELS,
+        selected=selected,
+        people=visible[:100],
+        issues_by_person=issues_by_person,
+        total_with_issues=sum(bool(issues) for issues in issues_by_person.values()),
+    ))
+
+
 @app.get("/export.csv")
 def export_people(db: Session = Depends(get_db)):
     output = io.StringIO()
@@ -587,6 +880,139 @@ def export_people(db: Session = Depends(get_db)):
         )])
     headers = {"Content-Disposition": 'attachment; filename="constellation-export.csv"'}
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv; charset=utf-8", headers=headers)
+
+
+def _contact_values(person: Person, method_type: str, primary_value: str | None) -> list[tuple[str, str]]:
+    values = []
+    seen = set()
+    if primary_value:
+        values.append(("Primary", primary_value))
+        seen.add(primary_value.casefold())
+    for method in person.methods:
+        if method.method_type != method_type or not method.value:
+            continue
+        normalized = method.value.casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        values.append((method.label or "Other", method.value))
+    return values
+
+
+def _profile_urls(person: Person) -> list[tuple[str, str]]:
+    values = []
+    seen = set()
+    for identity in person.identities:
+        if not identity.active or not identity.profile_url:
+            continue
+        normalized = identity.profile_url.rstrip("/").casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        label = "LinkedIn" if identity.provider == "linkedin" else identity.provider.replace("_", " ").title()
+        values.append((label, identity.profile_url))
+    return values
+
+
+@app.get("/export/google.csv")
+def export_google_contacts(db: Session = Depends(get_db)):
+    people = db.scalars(
+        select(Person)
+        .where(Person.archived_at.is_(None))
+        .options(
+            selectinload(Person.tags),
+            selectinload(Person.methods),
+            selectinload(Person.identities),
+        )
+        .order_by(Person.display_name)
+    ).all()
+    records = [
+        (
+            person,
+            _contact_values(person, "email", person.primary_email),
+            _contact_values(person, "phone", person.primary_phone),
+            _profile_urls(person),
+        )
+        for person in people
+    ]
+    max_emails = max((len(record[1]) for record in records), default=1)
+    max_phones = max((len(record[2]) for record in records), default=1)
+    max_websites = max((len(record[3]) for record in records), default=1)
+    max_emails = max(1, max_emails)
+    max_phones = max(1, max_phones)
+    max_websites = max(1, max_websites)
+
+    header = ["First Name", "Middle Name", "Last Name", "Nickname", "File as"]
+    for index in range(1, max_emails + 1):
+        header.extend([f"Email {index} - Label", f"Email {index} - Value"])
+    for index in range(1, max_phones + 1):
+        header.extend([f"Phone {index} - Label", f"Phone {index} - Value"])
+    header.extend(["Organization Name", "Organization Title"])
+    for index in range(1, max_websites + 1):
+        header.extend([f"Website {index} - Label", f"Website {index} - Value"])
+    custom_fields = (
+        "Constellation ID",
+        "Priority",
+        "Relationship Status",
+        "Last Contact",
+        "Next Follow-up",
+        "Location",
+        "Obsidian URI",
+    )
+    for index in range(1, len(custom_fields) + 1):
+        header.extend([f"Custom Field {index} - Label", f"Custom Field {index} - Value"])
+    header.extend(["Notes", "Labels"])
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(header)
+    for person, emails, phones, websites in records:
+        first_name = person.first_name
+        if not first_name and not person.last_name:
+            first_name = person.display_name
+        row = [
+            first_name or "",
+            person.middle_name or "",
+            person.last_name or "",
+            person.preferred_name or "",
+            person.display_name,
+        ]
+        for values, maximum in ((emails, max_emails), (phones, max_phones)):
+            for index in range(maximum):
+                if index < len(values):
+                    row.extend(values[index])
+                else:
+                    row.extend(["", ""])
+        row.extend([person.current_organization or "", person.current_title or ""])
+        for index in range(max_websites):
+            if index < len(websites):
+                row.extend(websites[index])
+            else:
+                row.extend(["", ""])
+        custom_values = (
+            person.id,
+            person.priority,
+            person.relationship_status,
+            person.last_meaningful_interaction,
+            person.next_followup,
+            person.location,
+            person.obsidian_uri,
+        )
+        for label, value in zip(custom_fields, custom_values, strict=True):
+            row.extend([label, value or ""])
+        row.extend([
+            person.general_note or "",
+            " ::: ".join(sorted(tag.name for tag in person.tags)),
+        ])
+        writer.writerow([safe_csv_cell(value) for value in row])
+    headers = {
+        "Content-Disposition": 'attachment; filename="constellation-google-contacts.csv"'
+    }
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers=headers,
+    )
 
 
 @app.get("/obsidian-uri")

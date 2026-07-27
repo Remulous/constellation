@@ -128,3 +128,5 @@ document.addEventListener("click", (event) => {
 interactionDialog?.addEventListener("click", (event) => {
   if (event.target === interactionDialog) interactionDialog.close();
 });
+
+document.querySelector("[data-print]")?.addEventListener("click", () => window.print());

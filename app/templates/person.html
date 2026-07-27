@@ -18,13 +18,8 @@
     </div>
   </div>
   <div class="profile-actions">
-    {% for identity in person.identities %}
-      {% if identity.provider == "linkedin" and identity.profile_url %}
-      <a class="button secondary" target="_blank" rel="noopener" href="{{ identity.profile_url }}">
-        <svg class="icon"><use href="/static/icons.svg#linkedin"></use></svg>LinkedIn
-      </a>
-      {% endif %}
-    {% endfor %}
+    {% if person.linkedin_url %}<a class="button secondary" target="_blank" rel="noopener" href="{{ person.linkedin_url }}"><svg class="icon"><use href="/static/icons.svg#linkedin"></use></svg>LinkedIn</a>{% endif %}
+    <a class="button secondary" href="/people/{{ person.id }}/brief"><svg class="icon"><use href="/static/icons.svg#note"></use></svg>Meeting brief</a>
     {% if person.obsidian_uri %}
     <a class="button secondary" href="{{ person.obsidian_uri }}">
       <svg class="icon"><use href="/static/icons.svg#note"></use></svg>Obsidian
