@@ -1,0 +1,27 @@
+{% for p in people %}
+<tr data-person-row>
+  <td class="select-cell"><input type="checkbox" name="person_ids" value="{{ p.id }}" data-row-select aria-label="Select {{ p.display_name }}"></td>
+  <td class="primary-cell" data-label="Person">
+    <a class="person-cell" href="/people/{{ p.id }}">
+      <span class="avatar" aria-hidden="true">{{ p.display_name[:2] }}</span>
+      <span><span class="cell-main">{{ p.display_name }}</span><span class="cell-sub">{{ p.current_title or "No title" }}</span></span>
+    </a>
+  </td>
+  <td data-label="Organization"><span class="cell-main">{{ p.current_organization or "—" }}</span></td>
+  <td data-label="Priority"><span class="badge priority-{{ p.priority }}">{{ p.priority|title }}</span></td>
+  <td data-label="Status"><span class="status-pill status-{{ p.relationship_status }}">{{ p.relationship_status|title }}</span></td>
+  <td class="date-cell" data-label="Last contact"><strong>{{ p.last_meaningful_interaction.strftime("%b %-d, %Y") if p.last_meaningful_interaction else "Never" }}</strong></td>
+  <td class="date-cell {{ 'overdue' if p.next_followup and p.next_followup < today else 'due' if p.next_followup and p.next_followup == today else '' }}" data-label="Next follow-up">
+    <strong>{{ p.next_followup.strftime("%b %-d, %Y") if p.next_followup else "Not scheduled" }}</strong>
+  </td>
+  <td class="wide-cell" data-label="Tags">{% for tag in p.tags %}<span class="badge">{{ tag.name }}</span>{% else %}<span class="subtle">—</span>{% endfor %}</td>
+  <td data-label="Action">
+    <button class="button secondary small" type="button" data-quick-interaction data-person-id="{{ p.id }}" data-person-name="{{ p.display_name }}">Log interaction</button>
+  </td>
+</tr>
+{% endfor %}
+{% if next_url %}
+<tr class="infinite-sentinel" data-infinite-sentinel data-next-url="{{ next_url }}">
+  <td colspan="9"><span class="loading-indicator">Loading more contacts…</span></td>
+</tr>
+{% endif %}

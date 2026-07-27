@@ -4,33 +4,53 @@
   <div>
     <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#merge"></use></svg>Data quality</p>
     <h1>Merge review</h1>
-    <p class="page-description">Compare uncertain matches side by side. Only deterministic matches are merged automatically.</p>
+    <p class="page-description">See why records matched, choose the best value for each field, and undo recent merges.</p>
   </div>
 </header>
 
 {% for c, source, target in rows %}
-<section class="panel" style="margin-bottom:1rem">
+<section class="panel merge-card">
   <div class="panel-header">
-    <div><p class="kicker">Suggested match</p><h2>{{ c.match_reason }}</h2></div>
+    <div><p class="kicker">Suggested match · {{ c.match_reason }}</p><h2>{{ source.display_name }} and {{ target.display_name }}</h2></div>
     <span class="badge priority-normal">{{ "%.0f"|format(c.confidence_score * 100) }}% confidence</span>
-  </div>
-  <div class="two">
-    {% for person in [source, target] %}
-    <article class="panel" style="background:var(--surface-soft);box-shadow:none">
-      <div class="person-cell" style="margin-bottom:.8rem">
-        <span class="avatar" aria-hidden="true">{{ person.display_name[:2] }}</span>
-        <span><span class="cell-main">{{ person.display_name }}</span><span class="cell-sub">{{ person.current_title or "No title" }}</span></span>
-      </div>
-      <p><span class="kicker">Organization</span><br>{{ person.current_organization or "—" }}</p>
-      <p><span class="kicker">Primary email</span><br>{{ person.primary_email or "—" }}</p>
-    </article>
-    {% endfor %}
   </div>
   <form method="post" action="/merge-review/{{ c.id }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label for="survivor-{{ c.id }}">Record to preserve</label>
-    <select id="survivor-{{ c.id }}" name="survivor_id"><option value="{{ target.id }}">{{ target.display_name }}</option><option value="{{ source.id }}">{{ source.display_name }}</option></select>
-    <div class="actions"><button name="action" value="approve"><svg class="icon"><use href="/static/icons.svg#check"></use></svg>Approve merge</button><button class="secondary" name="action" value="rejected">Not a match</button><button class="quiet" name="action" value="ignored">Decide later</button></div>
+    <div class="merge-survivor">
+      <div>
+        <label for="survivor-{{ c.id }}">Canonical record</label>
+        <select id="survivor-{{ c.id }}" name="survivor_id">
+          <option value="{{ target.id }}">{{ target.display_name }}</option>
+          <option value="{{ source.id }}">{{ source.display_name }}</option>
+        </select>
+      </div>
+      <p class="muted">All identities, contact methods, employment, interactions, and tags are preserved.</p>
+    </div>
+
+    <div class="merge-field-table">
+      <div class="merge-field-heading"><span>Field</span><span>{{ source.display_name }}</span><span>{{ target.display_name }}</span></div>
+      {% for field in merge_fields %}
+      {% set source_value = source|attr(field) %}
+      {% set target_value = target|attr(field) %}
+      <div class="merge-field-row">
+        <strong>{{ field.replace("_", " ")|title }}</strong>
+        <label class="merge-choice">
+          <input type="radio" name="field_{{ field }}" value="{{ source.id }}" {{ "checked" if not target_value and source_value }}>
+          <span>{{ source_value if source_value is not none and source_value != "" else "—" }}</span>
+        </label>
+        <label class="merge-choice">
+          <input type="radio" name="field_{{ field }}" value="{{ target.id }}" {{ "checked" if target_value or not source_value }}>
+          <span>{{ target_value if target_value is not none and target_value != "" else "—" }}</span>
+        </label>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="actions">
+      <button name="action" value="approve"><svg class="icon"><use href="/static/icons.svg#check"></use></svg>Merge records</button>
+      <button class="secondary" name="action" value="rejected">Not a match</button>
+      <button class="quiet" name="action" value="ignored">Decide later</button>
+    </div>
   </form>
 </section>
 {% else %}
@@ -40,4 +60,28 @@
   </div>
 </section>
 {% endfor %}
+
+{% if history %}
+<section class="panel merge-history">
+  <div class="panel-header">
+    <div><p class="kicker">Safety net</p><h2>Recent merges</h2></div>
+  </div>
+  {% for h in history %}
+  <div class="history-row">
+    <div>
+      <strong>{{ h.snapshot.get("duplicate", {}).get("display_name", h.snapshot.get("display_name", h.merged_person_id)) }}</strong>
+      <span class="muted">merged {{ h.merged_at.strftime("%b %-d, %Y at %-I:%M %p") }}</span>
+    </div>
+    {% if h.snapshot.get("duplicate") %}
+    <form method="post" action="/merge-history/{{ h.id }}/undo">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="secondary small" type="submit">Undo merge</button>
+    </form>
+    {% else %}
+    <span class="muted">Created before undo support</span>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
 {% endblock %}

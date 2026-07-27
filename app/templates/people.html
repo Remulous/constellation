@@ -4,7 +4,7 @@
   <div>
     <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#people"></use></svg>Relationship directory</p>
     <h1>People</h1>
-    <p class="page-description">Search your network, understand relationship status, and keep follow-ups moving.</p>
+    <p class="page-description">Search and scroll through all {{ total }} contacts without breaking your flow.</p>
   </div>
   <a class="button" href="/imports"><svg class="icon"><use href="/static/icons.svg#upload"></use></svg>Import contacts</a>
 </header>
@@ -34,7 +34,7 @@
   </form>
 </section>
 
-<form method="post" action="/people/bulk">
+<form method="post" action="/people/bulk" data-people-form>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <div class="bulk-toolbar" data-selection-toolbar>
     <span class="selection-count"><span data-selection-count>0</span> selected</span>
@@ -48,31 +48,15 @@
     <table>
       <thead>
         <tr>
-          <th><input type="checkbox" data-select-all aria-label="Select all people on this page"></th>
-          <th>Name</th><th>Organization</th><th>Priority</th><th>Status</th><th>Last contact</th><th>Next follow-up</th><th>Tags</th>
+          <th><input type="checkbox" data-select-all aria-label="Select all loaded people"></th>
+          <th>Name</th><th>Organization</th><th>Priority</th><th>Status</th><th>Last contact</th><th>Next follow-up</th><th>Tags</th><th>Action</th>
         </tr>
       </thead>
-      <tbody>
-      {% for p in people %}
-        <tr>
-          <td class="select-cell"><input type="checkbox" name="person_ids" value="{{ p.id }}" data-row-select aria-label="Select {{ p.display_name }}"></td>
-          <td class="primary-cell" data-label="Person">
-            <a class="person-cell" href="/people/{{ p.id }}">
-              <span class="avatar" aria-hidden="true">{{ p.display_name[:2] }}</span>
-              <span><span class="cell-main">{{ p.display_name }}</span><span class="cell-sub">{{ p.current_title or "No title" }}</span></span>
-            </a>
-          </td>
-          <td data-label="Organization"><span class="cell-main">{{ p.current_organization or "—" }}</span></td>
-          <td data-label="Priority"><span class="badge priority-{{ p.priority }}">{{ p.priority|title }}</span></td>
-          <td data-label="Status"><span class="status-pill status-{{ p.relationship_status }}">{{ p.relationship_status|title }}</span></td>
-          <td class="date-cell" data-label="Last contact"><strong>{{ p.last_meaningful_interaction.strftime("%b %-d, %Y") if p.last_meaningful_interaction else "Never" }}</strong></td>
-          <td class="date-cell {{ 'overdue' if p.next_followup and p.next_followup < today else 'due' if p.next_followup and p.next_followup == today else '' }}" data-label="Next follow-up">
-            <strong>{{ p.next_followup.strftime("%b %-d, %Y") if p.next_followup else "Not scheduled" }}</strong>
-          </td>
-          <td class="wide-cell" data-label="Tags">{% for tag in p.tags %}<span class="badge">{{ tag.name }}</span>{% else %}<span class="subtle">—</span>{% endfor %}</td>
-        </tr>
+      <tbody data-people-body>
+      {% if people %}
+        {% include "people_rows.html" %}
       {% else %}
-        <tr><td class="primary-cell" colspan="8">
+        <tr><td class="primary-cell" colspan="9">
           <div class="empty-state">
             <div>
               <span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#people"></use></svg></span>
@@ -81,17 +65,11 @@
             </div>
           </div>
         </td></tr>
-      {% endfor %}
+      {% endif %}
       </tbody>
     </table>
   </div>
 </form>
 
-{% if page > 1 or has_next %}
-<nav class="pagination" aria-label="People pages">
-  {% if page > 1 %}<a class="button secondary" href="?q={{ q }}&priority={{ priority }}&status={{ status }}&sort={{ sort }}&page={{ page-1 }}">Previous</a>{% endif %}
-  <span class="muted">Page {{ page }}</span>
-  {% if has_next %}<a class="button secondary" href="?q={{ q }}&priority={{ priority }}&status={{ status }}&sort={{ sort }}&page={{ page+1 }}">Next</a>{% endif %}
-</nav>
-{% endif %}
+{% include "_quick_interaction_modal.html" %}
 {% endblock %}

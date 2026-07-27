@@ -14,6 +14,8 @@
     <div class="settings-row"><span>Secure cookies</span><span class="status-pill {{ 'status-active' if secure_cookies else 'status-dormant' }}">{{ "Enabled" if secure_cookies else "Disabled" }}</span></div>
     <div class="settings-row"><span>Maximum upload</span><strong>{{ upload_limit }} MB</strong></div>
     <div class="settings-row"><span>Default Obsidian vault</span><strong>{{ obsidian_vault or "Not configured" }}</strong></div>
+    <div class="settings-row"><span>ChatGPT MCP connector</span><span class="status-pill {{ 'status-active' if mcp_enabled else 'status-dormant' }}">{{ "Enabled" if mcp_enabled else "Disabled" }}</span></div>
+    <div class="settings-row"><span>MCP endpoint</span><strong>{{ public_url }}/mcp</strong></div>
   </div>
   <div class="notice" style="margin-top:1rem"><svg class="icon"><use href="/static/icons.svg#settings"></use></svg><span>Change these values in <code>.env</code>, then restart the container to apply them.</span></div>
 </section>

@@ -20,6 +20,8 @@ services:
       SECURE_COOKIES: "true"
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
       OBSIDIAN_VAULT: ${OBSIDIAN_VAULT:-}
+      PUBLIC_URL: ${PUBLIC_URL:-https://constellation.local.remulous-tech.com}
+      MCP_API_TOKEN: ${MCP_API_TOKEN:-}
       CRM_DATA_DIR: /data
 
     volumes:
@@ -45,6 +47,50 @@ services:
       traefik.http.routers.constellation.rule: Host(`constellation.local.remulous-tech.com`)
       traefik.http.routers.constellation.tls: "true"
       traefik.http.services.constellation.loadbalancer.server.port: "8000"
+
+    networks:
+      - proxy
+
+  constellation-mcp:
+    image: constellation:latest
+    pull_policy: never
+    container_name: constellation-mcp
+    restart: unless-stopped
+    command: ["uvicorn", "app.mcp_server:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+
+    depends_on:
+      constellation:
+        condition: service_healthy
+
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:-https://constellation.local.remulous-tech.com}
+      MCP_API_TOKEN: ${MCP_API_TOKEN:-}
+      CRM_DATA_DIR: /data
+
+    volumes:
+      - type: bind
+        source: /docker/constellation/data
+        target: /data
+
+    read_only: true
+
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      traefik.http.routers.constellation-mcp.entrypoints: https
+      traefik.http.routers.constellation-mcp.rule: Host(`constellation.local.remulous-tech.com`) && PathPrefix(`/mcp`)
+      traefik.http.routers.constellation-mcp.priority: "100"
+      traefik.http.routers.constellation-mcp.tls: "true"
+      traefik.http.services.constellation-mcp.loadbalancer.server.port: "8000"
 
     networks:
       - proxy

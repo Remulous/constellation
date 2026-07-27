@@ -11,7 +11,7 @@
 
 <div class="table-wrap responsive-table">
   <table>
-    <thead><tr><th>Person</th><th>Organization</th><th>Priority</th><th>Last contact</th><th>Next follow-up</th></tr></thead>
+    <thead><tr><th>Person</th><th>Organization</th><th>Priority</th><th>Last contact</th><th>Next follow-up</th><th>Action</th></tr></thead>
     <tbody>
     {% for p in people %}
       <tr>
@@ -35,9 +35,10 @@
           {% endif %}
           <span>{{ p.next_followup.strftime("%b %-d, %Y") }}</span>
         </td>
+        <td data-label="Action"><button class="button secondary small" type="button" data-quick-interaction data-person-id="{{ p.id }}" data-person-name="{{ p.display_name }}">Log interaction</button></td>
       </tr>
     {% else %}
-      <tr><td class="primary-cell" colspan="5">
+      <tr><td class="primary-cell" colspan="6">
         <div class="empty-state">
           <div>
             <span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#check"></use></svg></span>
@@ -50,4 +51,5 @@
     </tbody>
   </table>
 </div>
+{% include "_quick_interaction_modal.html" %}
 {% endblock %}
