@@ -1,28 +1,97 @@
 {% extends "base.html" %}{% block title %}People · Constellation{% endblock %}
 {% block content %}
-<h1>People</h1>
-<form class="filters" method="get">
-  <div><label for="q">Search</label><input id="q" name="q" value="{{ q }}" placeholder="Name, organization, title or email"></div>
-  <div><label for="priority">Priority</label><select id="priority" name="priority"><option value="">All</option>{% for v in ["high","normal","low"] %}<option value="{{ v }}" {{ "selected" if priority == v }}>{{ v|title }}</option>{% endfor %}</select></div>
-  <div><label for="status">Status</label><select id="status" name="status"><option value="">All</option>{% for v in ["active","prospect","customer","partner","dormant"] %}<option value="{{ v }}" {{ "selected" if status == v }}>{{ v|title }}</option>{% endfor %}</select></div>
-  <div><label for="sort">Sort</label><select id="sort" name="sort">{% for v in ["name","organization","followup","recent"] %}<option value="{{ v }}" {{ "selected" if sort == v }}>{{ v|title }}</option>{% endfor %}</select></div>
-  <button>Apply</button>
+<header class="page-header">
+  <div>
+    <p class="page-eyebrow"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg>Relationship directory</p>
+    <h1>People</h1>
+    <p class="page-description">Search your network, understand relationship status, and keep follow-ups moving.</p>
+  </div>
+  <a class="button" href="/imports"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#upload"></use></svg>Import contacts</a>
+</header>
+
+<section class="panel filter-panel">
+  <form class="filters" method="get">
+    <div>
+      <label for="q">Search</label>
+      <input id="q" name="q" value="{{ q }}" placeholder="Name, organization, title or email">
+    </div>
+    <div>
+      <label for="priority">Priority</label>
+      <select id="priority" name="priority"><option value="">All priorities</option>{% for v in ["high","normal","low"] %}<option value="{{ v }}" {{ "selected" if priority == v }}>{{ v|title }}</option>{% endfor %}</select>
+    </div>
+    <div>
+      <label for="status">Status</label>
+      <select id="status" name="status"><option value="">All statuses</option>{% for v in ["active","prospect","customer","partner","dormant"] %}<option value="{{ v }}" {{ "selected" if status == v }}>{{ v|title }}</option>{% endfor %}</select>
+    </div>
+    <div>
+      <label for="sort">Sort</label>
+      <select id="sort" name="sort">{% for v in ["name","organization","followup","recent"] %}<option value="{{ v }}" {{ "selected" if sort == v }}>{{ v|title }}</option>{% endfor %}</select>
+    </div>
+    <div class="filter-actions">
+      <button type="submit">Apply</button>
+      {% if q or priority or status or sort != "name" %}<a class="button secondary" href="/people">Clear</a>{% endif %}
+    </div>
+  </form>
+</section>
+
+<form method="post" action="/people/bulk">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="bulk-toolbar" data-selection-toolbar>
+    <span class="selection-count"><span data-selection-count>0</span> selected</span>
+    <select name="bulk_action" aria-label="Bulk action"><option value="tag">Add tag</option><option value="cadence">Set cadence</option></select>
+    <select name="tag_id" aria-label="Tag to apply"><option value="">Choose tag</option>{% for tag in all_tags %}<option value="{{ tag.id }}">{{ tag.name }}</option>{% endfor %}</select>
+    <select name="cadence" aria-label="Cadence to apply"><option value="">No cadence</option>{% for v in [14,30,60,90,180] %}<option value="{{ v }}">{{ v }} days</option>{% endfor %}</select>
+    <button type="submit">Apply to selected</button>
+  </div>
+
+  <div class="table-wrap responsive-table">
+    <table>
+      <thead>
+        <tr>
+          <th><input type="checkbox" data-select-all aria-label="Select all people on this page"></th>
+          <th>Name</th><th>Organization</th><th>Priority</th><th>Status</th><th>Last contact</th><th>Next follow-up</th><th>Tags</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in people %}
+        <tr>
+          <td class="select-cell"><input type="checkbox" name="person_ids" value="{{ p.id }}" data-row-select aria-label="Select {{ p.display_name }}"></td>
+          <td class="primary-cell" data-label="Person">
+            <a class="person-cell" href="/people/{{ p.id }}">
+              <span class="avatar" aria-hidden="true">{{ p.display_name[:2] }}</span>
+              <span><span class="cell-main">{{ p.display_name }}</span><span class="cell-sub">{{ p.current_title or "No title" }}</span></span>
+            </a>
+          </td>
+          <td data-label="Organization"><span class="cell-main">{{ p.current_organization or "—" }}</span></td>
+          <td data-label="Priority"><span class="badge priority-{{ p.priority }}">{{ p.priority|title }}</span></td>
+          <td data-label="Status"><span class="status-pill status-{{ p.relationship_status }}">{{ p.relationship_status|title }}</span></td>
+          <td class="date-cell" data-label="Last contact"><strong>{{ p.last_meaningful_interaction.strftime("%b %-d, %Y") if p.last_meaningful_interaction else "Never" }}</strong></td>
+          <td class="date-cell {{ 'overdue' if p.next_followup and p.next_followup < today else 'due' if p.next_followup and p.next_followup == today else '' }}" data-label="Next follow-up">
+            <strong>{{ p.next_followup.strftime("%b %-d, %Y") if p.next_followup else "Not scheduled" }}</strong>
+          </td>
+          <td class="wide-cell" data-label="Tags">{% for tag in p.tags %}<span class="badge">{{ tag.name }}</span>{% else %}<span class="subtle">—</span>{% endfor %}</td>
+        </tr>
+      {% else %}
+        <tr><td class="primary-cell" colspan="8">
+          <div class="empty-state">
+            <div>
+              <span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg></span>
+              <h3>No people found</h3>
+              <p>{{ "Try adjusting your search or filters." if q or priority or status else "Import contacts to begin building your relationship directory." }}</p>
+            </div>
+          </div>
+        </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </form>
-<form method="post" action="/people/bulk"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-<div class="actions">
-  <select name="bulk_action" style="max-width:180px"><option value="tag">Add tag</option><option value="cadence">Set cadence</option></select>
-  <select name="tag_id" style="max-width:220px"><option value="">Choose tag</option>{% for tag in all_tags %}<option value="{{ tag.id }}">{{ tag.name }}</option>{% endfor %}</select>
-  <select name="cadence" style="max-width:180px"><option value="">No cadence</option>{% for v in [14,30,60,90,180] %}<option value="{{ v }}">{{ v }} days</option>{% endfor %}</select>
-  <button>Apply to selected</button>
-</div>
-<div class="table-wrap"><table><thead><tr><th></th><th>Name</th><th>Organization</th><th>Title</th><th>Priority</th><th>Status</th><th>Last contact</th><th>Next follow-up</th><th>Tags</th></tr></thead><tbody>
-{% for p in people %}<tr>
-  <td><input type="checkbox" name="person_ids" value="{{ p.id }}" aria-label="Select {{ p.display_name }}"></td>
-  <td><a href="/people/{{ p.id }}">{{ p.display_name }}</a></td><td>{{ p.current_organization or "—" }}</td><td>{{ p.current_title or "—" }}</td>
-  <td>{{ p.priority }}</td><td>{{ p.relationship_status }}</td><td>{{ p.last_meaningful_interaction or "—" }}</td><td>{{ p.next_followup or "—" }}</td>
-  <td>{% for tag in p.tags %}<span class="badge">{{ tag.name }}</span>{% endfor %}</td>
-</tr>{% else %}<tr><td colspan="9">No people match these filters.</td></tr>{% endfor %}
-</tbody></table></div></form>
-<div class="actions">{% if page > 1 %}<a class="button secondary" href="?q={{ q }}&priority={{ priority }}&status={{ status }}&sort={{ sort }}&page={{ page-1 }}">Previous</a>{% endif %}
-{% if has_next %}<a class="button secondary" href="?q={{ q }}&priority={{ priority }}&status={{ status }}&sort={{ sort }}&page={{ page+1 }}">Next</a>{% endif %}</div>
+
+{% if page > 1 or has_next %}
+<nav class="pagination" aria-label="People pages">
+  {% if page > 1 %}<a class="button secondary" href="?q={{ q }}&priority={{ priority }}&status={{ status }}&sort={{ sort }}&page={{ page-1 }}">Previous</a>{% endif %}
+  <span class="muted">Page {{ page }}</span>
+  {% if has_next %}<a class="button secondary" href="?q={{ q }}&priority={{ priority }}&status={{ status }}&sort={{ sort }}&page={{ page+1 }}">Next</a>{% endif %}
+</nav>
+{% endif %}
 {% endblock %}

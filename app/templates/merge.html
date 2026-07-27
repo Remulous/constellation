@@ -1,7 +1,43 @@
 {% extends "base.html" %}{% block title %}Merge review · Constellation{% endblock %}
-{% block content %}<h1>Merge review</h1><p>Only deterministic matches merge automatically. These suggestions require your decision.</p>
-{% for c, source, target in rows %}<section class="panel" style="margin-bottom:1rem"><p><strong>{{ c.match_reason }}</strong> · confidence {{ "%.0f"|format(c.confidence_score * 100) }}%</p>
-<div class="two"><div><h3>{{ source.display_name }}</h3><p>{{ source.current_title or "—" }}<br>{{ source.current_organization or "—" }}<br>{{ source.primary_email or "—" }}</p></div><div><h3>{{ target.display_name }}</h3><p>{{ target.current_title or "—" }}<br>{{ target.current_organization or "—" }}<br>{{ target.primary_email or "—" }}</p></div></div>
-<form method="post" action="/merge-review/{{ c.id }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>Record to preserve</label><select name="survivor_id"><option value="{{ target.id }}">{{ target.display_name }}</option><option value="{{ source.id }}">{{ source.display_name }}</option></select><div class="actions"><button name="action" value="approve">Approve merge</button><button class="secondary" name="action" value="rejected">Reject</button><button class="secondary" name="action" value="ignored">Ignore</button></div></form>
-</section>{% else %}<section class="panel"><p>No pending merge candidates.</p></section>{% endfor %}{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <p class="page-eyebrow"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#merge"></use></svg>Data quality</p>
+    <h1>Merge review</h1>
+    <p class="page-description">Compare uncertain matches side by side. Only deterministic matches are merged automatically.</p>
+  </div>
+</header>
 
+{% for c, source, target in rows %}
+<section class="panel" style="margin-bottom:1rem">
+  <div class="panel-header">
+    <div><p class="kicker">Suggested match</p><h2>{{ c.match_reason }}</h2></div>
+    <span class="badge priority-normal">{{ "%.0f"|format(c.confidence_score * 100) }}% confidence</span>
+  </div>
+  <div class="two">
+    {% for person in [source, target] %}
+    <article class="panel" style="background:var(--surface-soft);box-shadow:none">
+      <div class="person-cell" style="margin-bottom:.8rem">
+        <span class="avatar" aria-hidden="true">{{ person.display_name[:2] }}</span>
+        <span><span class="cell-main">{{ person.display_name }}</span><span class="cell-sub">{{ person.current_title or "No title" }}</span></span>
+      </div>
+      <p><span class="kicker">Organization</span><br>{{ person.current_organization or "—" }}</p>
+      <p><span class="kicker">Primary email</span><br>{{ person.primary_email or "—" }}</p>
+    </article>
+    {% endfor %}
+  </div>
+  <form method="post" action="/merge-review/{{ c.id }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="survivor-{{ c.id }}">Record to preserve</label>
+    <select id="survivor-{{ c.id }}" name="survivor_id"><option value="{{ target.id }}">{{ target.display_name }}</option><option value="{{ source.id }}">{{ source.display_name }}</option></select>
+    <div class="actions"><button name="action" value="approve"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#check"></use></svg>Approve merge</button><button class="secondary" name="action" value="rejected">Not a match</button><button class="quiet" name="action" value="ignored">Decide later</button></div>
+  </form>
+</section>
+{% else %}
+<section class="panel">
+  <div class="empty-state">
+    <div><span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#check"></use></svg></span><h3>No pending candidates</h3><p>Your relationship records are reconciled and the review queue is clear.</p></div>
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

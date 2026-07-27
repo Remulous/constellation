@@ -1,8 +1,48 @@
 {% extends "base.html" %}{% block title %}Imports · Constellation{% endblock %}
-{% block content %}<h1>Imports</h1>
-<section class="panel"><h2>Import a CSV snapshot</h2><p class="muted">CSV contents are parsed and discarded. The original row payload and file hash remain for auditability.</p>
-<form method="post" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><div class="two"><div><label>Provider</label><select name="provider"><option value="google_contacts">Google Contacts</option><option value="linkedin">LinkedIn Connections</option></select></div><div><label>CSV file</label><input type="file" name="csv_file" accept=".csv,text/csv" required></div></div><div class="actions"><button>Import</button></div></form></section>
-<h2>Import history</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Provider</th><th>File</th><th>Status</th><th>Rows</th><th>Created</th><th>Matched</th><th>Review</th></tr></thead><tbody>
-{% for b in batches %}<tr><td>{{ b.imported_at.strftime("%Y-%m-%d %H:%M") }}</td><td>{{ b.provider }}</td><td>{{ b.original_filename }}</td><td>{{ b.status }}</td><td>{{ b.row_count }}</td><td>{{ b.created_contacts }}</td><td>{{ b.exact_matches }}</td><td>{{ b.possible_matches }}</td></tr>{% else %}<tr><td colspan="8">No imports yet.</td></tr>{% endfor %}
-</tbody></table></div>{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <p class="page-eyebrow"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#upload"></use></svg>Data intake</p>
+    <h1>Imports</h1>
+    <p class="page-description">Bring in a fresh Google Contacts or LinkedIn snapshot while preserving your private CRM fields.</p>
+  </div>
+</header>
 
+<section class="panel" style="margin-bottom:1rem">
+  <div class="panel-header">
+    <div><h2>Import a CSV snapshot</h2><p>Source contents are processed locally and the uploaded file is discarded.</p></div>
+    <span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#shield"></use></svg></span>
+  </div>
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="two">
+      <div><label for="provider">Provider</label><select id="provider" name="provider"><option value="google_contacts">Google Contacts</option><option value="linkedin">LinkedIn Connections</option></select></div>
+      <div><label for="csv_file">CSV file</label><input id="csv_file" type="file" name="csv_file" accept=".csv,text/csv" required></div>
+    </div>
+    <div class="actions"><button type="submit"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#upload"></use></svg>Import snapshot</button></div>
+  </form>
+  <div class="notice"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#shield"></use></svg><span>The original row payload and file hash remain for auditability. Re-importing does not overwrite private notes, tags, priority, status, or cadence.</span></div>
+</section>
+
+<section>
+  <div class="section-header"><div><p class="kicker">Audit trail</p><h2>Import history</h2></div></div>
+  <div class="table-wrap responsive-table">
+    <table>
+      <thead><tr><th>When</th><th>Provider</th><th>File</th><th>Status</th><th>Rows</th><th>Created</th><th>Matched</th><th>Review</th></tr></thead>
+      <tbody>
+      {% for b in batches %}
+        <tr>
+          <td class="primary-cell date-cell" data-label="Imported"><strong>{{ b.imported_at.strftime("%b %-d, %Y") }}</strong><span>{{ b.imported_at.strftime("%-I:%M %p") }}</span></td>
+          <td data-label="Provider"><span class="status-pill status-active">{{ b.provider|replace("_", " ")|title }}</span></td>
+          <td data-label="File"><span class="cell-main">{{ b.original_filename }}</span></td>
+          <td data-label="Status"><span class="status-pill {{ 'status-active' if b.status == 'completed' else 'status-dormant' }}">{{ b.status|title }}</span></td>
+          <td data-label="Rows">{{ b.row_count }}</td><td data-label="Created">{{ b.created_contacts }}</td><td data-label="Matched">{{ b.exact_matches }}</td><td data-label="Review">{{ b.possible_matches }}</td>
+        </tr>
+      {% else %}
+        <tr><td class="primary-cell" colspan="8"><div class="empty-state"><div><span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#upload"></use></svg></span><h3>No imports yet</h3><p>Your completed import snapshots will appear here.</p></div></div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

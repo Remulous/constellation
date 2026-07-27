@@ -1,4 +1,32 @@
 {% extends "base.html" %}{% block title %}Tags · Constellation{% endblock %}
-{% block content %}<h1>Tags</h1><div class="two"><section class="panel"><h2>Add tag or group</h2><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>Name</label><input name="name" required><label>Description</label><textarea name="description"></textarea><div class="actions"><button>Add</button></div></form></section>
-<section class="panel"><h2>Existing tags</h2>{% for tag in tags %}<p><strong>{{ tag.name }}</strong><br><span class="muted">{{ tag.description or "No description" }} · {{ tag.people|length }} people</span></p>{% else %}<p class="muted">No tags yet.</p>{% endfor %}</section></div>{% endblock %}
-
+{% block content %}
+<header class="page-header">
+  <div>
+    <p class="page-eyebrow"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#tag"></use></svg>Relationship organization</p>
+    <h1>Tags</h1>
+    <p class="page-description">Create lightweight groups that make your network easier to segment and revisit.</p>
+  </div>
+</header>
+<div class="two">
+  <section class="panel">
+    <div class="panel-header"><div><h2>Add a tag</h2><p>Use a short, recognizable name.</p></div></div>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="name">Name</label><input id="name" name="name" placeholder="e.g. Veterans, Data partners, Close friends" required>
+      <label for="description">Description</label><textarea id="description" name="description" placeholder="What does this group represent?"></textarea>
+      <div class="actions"><button type="submit"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#tag"></use></svg>Add tag</button></div>
+    </form>
+  </section>
+  <section class="panel">
+    <div class="panel-header"><div><h2>Existing tags</h2><p>{{ tags|length }} group{{ '' if tags|length == 1 else 's' }} in your CRM.</p></div></div>
+    {% for tag in tags %}
+    <div class="source-row">
+      <p><span class="badge priority-normal">{{ tag.name }}</span><br><span class="muted">{{ tag.description or "No description" }}</span></p>
+      <strong>{{ tag.people|length }} <span class="muted">people</span></strong>
+    </div>
+    {% else %}
+    <div class="empty-state compact"><div><span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#tag"></use></svg></span><h3>No tags yet</h3><p>Add your first group to organize people across relationship types.</p></div></div>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

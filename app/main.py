@@ -147,7 +147,7 @@ def people(
     all_tags = db.scalars(select(Tag).order_by(Tag.name)).all()
     return templates.TemplateResponse("people.html", context(
         request, people=rows[:50], q=q, priority=priority, status=status,
-        sort=sort, page=page, has_next=has_next, all_tags=all_tags,
+        sort=sort, page=page, has_next=has_next, all_tags=all_tags, today=date.today(),
     ))
 
 
