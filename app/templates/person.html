@@ -1,34 +1,181 @@
 {% extends "base.html" %}{% block title %}{{ person.display_name }} · Constellation{% endblock %}
 {% block content %}
-<div class="actions"><a class="button secondary" href="/people">← People</a>
-{% for identity in person.identities %}{% if identity.provider == "linkedin" and identity.profile_url %}<a class="button" target="_blank" rel="noopener" href="{{ identity.profile_url }}">Open LinkedIn</a>{% endif %}{% endfor %}
-{% if person.obsidian_uri %}<a class="button" href="{{ person.obsidian_uri }}">Open in Obsidian</a>{% endif %}</div>
-<h1>{{ person.display_name }}</h1><p class="muted">{{ person.current_title or "" }}{% if person.current_title and person.current_organization %} at {% endif %}{{ person.current_organization or "" }}</p>
-<div class="two">
-<section class="panel"><h2>CRM details</h2>
-<form method="post" action="/people/{{ person.id }}/edit"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-<label>Name</label><input name="display_name" value="{{ person.display_name }}" required>
-<label>Organization</label><input name="organization" value="{{ person.current_organization or '' }}">
-<label>Title</label><input name="title" value="{{ person.current_title or '' }}">
-<div class="two"><div><label>Priority</label><select name="priority">{% for v in ["high","normal","low"] %}<option {{ "selected" if person.priority == v }}>{{ v }}</option>{% endfor %}</select></div>
-<div><label>Status</label><select name="relationship_status">{% for v in ["active","prospect","customer","partner","dormant"] %}<option {{ "selected" if person.relationship_status == v }}>{{ v }}</option>{% endfor %}</select></div></div>
-<label>Follow-up cadence</label><select name="cadence"><option value="">No cadence</option>{% for v in [14,30,60,90,180] %}<option value="{{ v }}" {{ "selected" if person.followup_interval_days == v }}>{{ v }} days</option>{% endfor %}</select>
-<label>Tags</label><select name="tag_ids" multiple size="5">{% for tag in all_tags %}<option value="{{ tag.id }}" {{ "selected" if tag in person.tags }}>{{ tag.name }}</option>{% endfor %}</select>
-<label>Obsidian URI</label><input name="obsidian_uri" value="{{ person.obsidian_uri or '' }}" placeholder="obsidian://open?vault=...">
-<label>CRM note</label><textarea name="general_note">{{ person.general_note or "" }}</textarea>
-<div class="actions"><button>Save details</button></div></form>
-</section>
-<div class="grid">
-<section class="panel"><h2>Follow-up</h2><p>Last meaningful: <strong>{{ person.last_meaningful_interaction or "Never" }}</strong><br>Next: <strong>{{ person.next_followup or "Not scheduled" }}</strong></p>
-<form method="post" action="/people/{{ person.id }}/followup"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>Date</label><input type="date" name="followup_date"><div class="actions"><button name="action" value="schedule">Schedule</button><button class="secondary" name="action" value="snooze">Snooze</button><button class="secondary" name="action" value="clear">Clear override</button><button class="danger" name="action" value="archive">Archive</button></div></form>
-</section>
-<section class="panel"><h2>Contact methods</h2>{% for m in person.methods %}<p><span class="badge">{{ m.method_type }}</span> {{ m.value }} <span class="muted">{{ m.label or "" }} · {{ m.source or "" }}</span></p>{% else %}<p class="muted">None imported.</p>{% endfor %}</section>
-<section class="panel"><h2>Sources</h2>{% for i in person.identities %}<p><strong>{{ i.provider }}</strong> · {{ "active" if i.active else "missing from latest snapshot" }}<br><span class="muted">Imported {{ i.last_imported_at.strftime("%Y-%m-%d") }}</span></p>{% endfor %}</section>
-</div></div>
-<section class="panel" style="margin-top:1rem"><h2>Log interaction</h2><form method="post" action="/people/{{ person.id }}/interactions"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-<div class="filters"><div><label>Type</label><select name="interaction_type">{% for v in ["Email","LinkedIn","Phone call","Text message","Meeting","In-person","Introduction","Note","Other"] %}<option>{{ v }}</option>{% endfor %}</select></div>
-<div><label>Date</label><input type="date" name="interaction_date" required></div><div><label>Direction</label><select name="direction"><option value="">N/A</option><option>inbound</option><option>outbound</option></select></div>
-<div><label>Meaningful</label><input type="checkbox" name="meaningful" value="true" checked></div><button>Log</button></div><label>Summary</label><textarea name="summary"></textarea></form>
-<h3>Timeline</h3>{% for i in person.interactions|sort(attribute="interaction_date", reverse=true) %}<p><strong>{{ i.interaction_date }} · {{ i.interaction_type }}</strong>{% if i.meaningful %}<span class="badge">meaningful</span>{% endif %}<br>{{ i.summary or "" }}</p>{% else %}<p class="muted">No interactions logged.</p>{% endfor %}</section>
-{% endblock %}
+<div class="actions">
+  <a class="button quiet" href="/people">← Back to people</a>
+</div>
 
+<section class="profile-hero">
+  <div class="profile-identity">
+    <span class="avatar large" aria-hidden="true">{{ person.display_name[:2] }}</span>
+    <div>
+      <div class="actions" style="margin:0 0 .3rem">
+        <span class="status-pill status-{{ person.relationship_status }}">{{ person.relationship_status|title }}</span>
+        <span class="badge priority-{{ person.priority }}">{{ person.priority|title }} priority</span>
+      </div>
+      <h1>{{ person.display_name }}</h1>
+      <p>{{ person.current_title or "No title" }}{% if person.current_organization %} at {{ person.current_organization }}{% endif %}</p>
+      {% if person.tags %}<div class="profile-tags">{% for tag in person.tags %}<span class="badge">{{ tag.name }}</span>{% endfor %}</div>{% endif %}
+    </div>
+  </div>
+  <div class="profile-actions">
+    {% for identity in person.identities %}
+      {% if identity.provider == "linkedin" and identity.profile_url %}
+      <a class="button secondary" target="_blank" rel="noopener" href="{{ identity.profile_url }}">
+        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#linkedin"></use></svg>LinkedIn
+      </a>
+      {% endif %}
+    {% endfor %}
+    {% if person.obsidian_uri %}
+    <a class="button secondary" href="{{ person.obsidian_uri }}">
+      <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#note"></use></svg>Obsidian
+    </a>
+    {% endif %}
+    <a class="button" href="#log-interaction">
+      <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#edit"></use></svg>Log interaction
+    </a>
+  </div>
+</section>
+
+<div class="profile-layout">
+  <div class="stack">
+    {% if person.general_note %}
+    <section class="panel">
+      <p class="kicker">Relationship context</p>
+      <h2>CRM note</h2>
+      <p>{{ person.general_note }}</p>
+    </section>
+    {% endif %}
+
+    <section class="panel" id="log-interaction">
+      <div class="panel-header">
+        <div><h2>Interaction history</h2><p>Keep the relationship current without storing message bodies.</p></div>
+      </div>
+      <form class="interaction-form" method="post" action="/people/{{ person.id }}/interactions">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="interaction-fields">
+          <div>
+            <label for="interaction_type">Type</label>
+            <select id="interaction_type" name="interaction_type">{% for v in ["Email","LinkedIn","Phone call","Text message","Meeting","In-person","Introduction","Note","Other"] %}<option>{{ v }}</option>{% endfor %}</select>
+          </div>
+          <div><label for="interaction_date">Date</label><input id="interaction_date" type="date" name="interaction_date" required></div>
+          <div><label for="direction">Direction</label><select id="direction" name="direction"><option value="">N/A</option><option>inbound</option><option>outbound</option></select></div>
+          <div>
+            <label>Follow-up impact</label>
+            <label class="checkbox-label"><input type="checkbox" name="meaningful" value="true" checked> Meaningful</label>
+          </div>
+          <button type="submit">Log</button>
+        </div>
+        <label for="summary">Summary</label>
+        <textarea id="summary" name="summary" placeholder="A short note about what happened and what matters next"></textarea>
+      </form>
+
+      <h3>Timeline</h3>
+      {% if person.interactions %}
+      <div class="timeline">
+        {% for i in person.interactions|sort(attribute="interaction_date", reverse=true) %}
+        <article class="timeline-entry">
+          <span class="timeline-dot" aria-hidden="true"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#note"></use></svg></span>
+          <div class="timeline-body">
+            <div class="timeline-title">
+              <strong>{{ i.interaction_type }}</strong>
+              {% if i.meaningful %}<span class="badge priority-normal">Meaningful</span>{% endif %}
+              {% if i.direction %}<span class="badge">{{ i.direction|title }}</span>{% endif %}
+            </div>
+            <div class="muted">{{ i.interaction_date.strftime("%B %-d, %Y") }}</div>
+            {% if i.summary %}<p class="timeline-summary">{{ i.summary }}</p>{% endif %}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state compact">
+        <div>
+          <span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#note"></use></svg></span>
+          <h3>No interactions logged</h3>
+          <p>Add the first touchpoint to begin this relationship timeline.</p>
+        </div>
+      </div>
+      {% endif %}
+    </section>
+
+    <details class="panel details-panel">
+      <summary><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#edit"></use></svg>Edit CRM details</summary>
+      <div class="details-body">
+        <form method="post" action="/people/{{ person.id }}/edit">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label for="display_name">Name</label><input id="display_name" name="display_name" value="{{ person.display_name }}" required>
+          <div class="two">
+            <div><label for="organization">Organization</label><input id="organization" name="organization" value="{{ person.current_organization or '' }}"></div>
+            <div><label for="title">Title</label><input id="title" name="title" value="{{ person.current_title or '' }}"></div>
+          </div>
+          <div class="two">
+            <div><label for="priority">Priority</label><select id="priority" name="priority">{% for v in ["high","normal","low"] %}<option {{ "selected" if person.priority == v }}>{{ v }}</option>{% endfor %}</select></div>
+            <div><label for="relationship_status">Status</label><select id="relationship_status" name="relationship_status">{% for v in ["active","prospect","customer","partner","dormant"] %}<option {{ "selected" if person.relationship_status == v }}>{{ v }}</option>{% endfor %}</select></div>
+          </div>
+          <label for="cadence">Follow-up cadence</label><select id="cadence" name="cadence"><option value="">No cadence</option>{% for v in [14,30,60,90,180] %}<option value="{{ v }}" {{ "selected" if person.followup_interval_days == v }}>{{ v }} days</option>{% endfor %}</select>
+          <label for="tag_ids">Tags</label><select id="tag_ids" name="tag_ids" multiple size="5">{% for tag in all_tags %}<option value="{{ tag.id }}" {{ "selected" if tag in person.tags }}>{{ tag.name }}</option>{% endfor %}</select>
+          <label for="obsidian_uri">Obsidian URI</label><input id="obsidian_uri" name="obsidian_uri" value="{{ person.obsidian_uri or '' }}" placeholder="obsidian://open?vault=...">
+          <label for="general_note">CRM note</label><textarea id="general_note" name="general_note">{{ person.general_note or "" }}</textarea>
+          <div class="actions"><button type="submit">Save details</button></div>
+        </form>
+      </div>
+    </details>
+  </div>
+
+  <aside class="stack">
+    <section class="panel followup-card">
+      <div class="panel-header">
+        <div><p class="kicker">Relationship rhythm</p><h2>Follow-up</h2></div>
+        <span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#calendar"></use></svg></span>
+      </div>
+      <div class="followup-summary">
+        <div class="followup-stat"><span>Last meaningful</span><strong>{{ person.last_meaningful_interaction.strftime("%b %-d, %Y") if person.last_meaningful_interaction else "Never" }}</strong></div>
+        <div class="followup-stat"><span>Next follow-up</span><strong>{{ person.next_followup.strftime("%b %-d, %Y") if person.next_followup else "Not scheduled" }}</strong></div>
+      </div>
+      <form method="post" action="/people/{{ person.id }}/followup">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="followup_date">Choose a date</label>
+        <input id="followup_date" type="date" name="followup_date">
+        <div class="actions">
+          <button name="action" value="schedule">Schedule</button>
+          <button class="secondary" name="action" value="snooze">Snooze</button>
+          <button class="quiet" name="action" value="clear">Clear override</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header"><div><h2>Contact methods</h2><p>Imported ways to reach this person.</p></div></div>
+      {% for m in person.methods %}
+      <div class="contact-method">
+        <span class="contact-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#{{ 'people' if m.method_type == 'phone' else 'note' }}"></use></svg></span>
+        <p><strong>{{ m.value }}</strong><br><span class="muted">{{ m.method_type|title }}{% if m.label %} · {{ m.label }}{% endif %}{% if m.source %} · {{ m.source|replace("_", " ")|title }}{% endif %}</span></p>
+      </div>
+      {% else %}
+      <p class="muted">No contact methods imported.</p>
+      {% endfor %}
+    </section>
+
+    <section class="panel">
+      <div class="panel-header"><div><h2>Sources</h2><p>Where this record came from.</p></div></div>
+      {% for i in person.identities %}
+      <div class="source-row">
+        <p><strong>{{ i.provider|replace("_", " ")|title }}</strong><br><span class="muted">Imported {{ i.last_imported_at.strftime("%b %-d, %Y") }}</span></p>
+        <span class="status-pill {{ 'status-active' if i.active else 'status-dormant' }}">{{ "Active" if i.active else "Missing" }}</span>
+      </div>
+      {% else %}<p class="muted">No source identities.</p>{% endfor %}
+    </section>
+
+    <details class="panel details-panel danger-zone">
+      <summary><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#alert"></use></svg>Archive person</summary>
+      <div class="details-body">
+        <p class="muted">Archiving removes this person from active views without deleting their history.</p>
+        <form method="post" action="/people/{{ person.id }}/followup">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="danger" name="action" value="archive">Archive {{ person.display_name }}</button>
+        </form>
+      </div>
+    </details>
+  </aside>
+</div>
+{% endblock %}

@@ -1,7 +1,29 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-<title>Sign in</title><link rel="stylesheet" href="{{ url_for('static', path='app.css') }}"></head>
-<body><main style="max-width:420px"><section class="panel"><h1>Constellation</h1>
-{% if error %}<p class="flash">{{ error }}</p>{% endif %}
-<form method="post"><label for="password">Application password</label><input id="password" name="password" type="password" required autofocus><div class="actions"><button>Sign in</button></div></form>
-</section></main></body></html>
-
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <title>Sign in · Constellation</title>
+  <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+</head>
+<body>
+<main class="login-shell">
+  <section class="panel login-card">
+    <div class="login-brand">
+      <span class="brand-mark"><svg class="icon icon-xl"><use href="{{ url_for('static', path='icons.svg') }}#constellation"></use></svg></span>
+      <h1>Welcome to Constellation</h1>
+      <p class="muted">Your private relationship workspace.</p>
+    </div>
+    {% if error %}<p class="flash" role="alert">{{ error }}</p>{% endif %}
+    <form method="post">
+      <label for="password">Application password</label>
+      <input id="password" name="password" type="password" required autofocus>
+      <div class="actions"><button type="submit" style="width:100%">Sign in</button></div>
+    </form>
+    <div class="notice"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#shield"></use></svg><span>Your relationship data stays on this private instance.</span></div>
+  </section>
+</main>
+</body>
+</html>

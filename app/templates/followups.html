@@ -1,5 +1,53 @@
 {% extends "base.html" %}{% block title %}Follow-ups · Constellation{% endblock %}
-{% block content %}<h1>Follow-ups</h1><div class="table-wrap"><table><thead><tr><th>Person</th><th>Organization</th><th>Priority</th><th>Last contact</th><th>Next follow-up</th></tr></thead><tbody>
-{% for p in people %}<tr><td><a href="/people/{{ p.id }}">{{ p.display_name }}</a></td><td>{{ p.current_organization or "—" }}</td><td>{{ p.priority }}</td><td>{{ p.last_meaningful_interaction or "Never" }}</td><td class="{{ 'overdue' if p.next_followup < today else 'due' if p.next_followup == today else '' }}">{{ p.next_followup }}</td></tr>{% else %}<tr><td colspan="5">No follow-ups scheduled.</td></tr>{% endfor %}
-</tbody></table></div>{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <p class="page-eyebrow"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#calendar"></use></svg>Relationship rhythm</p>
+    <h1>Follow-ups</h1>
+    <p class="page-description">A focused queue of the relationships that are due for attention.</p>
+  </div>
+  <a class="button secondary" href="/people?sort=followup"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg>Manage cadences</a>
+</header>
 
+<div class="table-wrap responsive-table">
+  <table>
+    <thead><tr><th>Person</th><th>Organization</th><th>Priority</th><th>Last contact</th><th>Next follow-up</th></tr></thead>
+    <tbody>
+    {% for p in people %}
+      <tr>
+        <td class="primary-cell" data-label="Person">
+          <a class="person-cell" href="/people/{{ p.id }}">
+            <span class="avatar" aria-hidden="true">{{ p.display_name[:2] }}</span>
+            <span><span class="cell-main">{{ p.display_name }}</span><span class="cell-sub">{{ p.current_title or "No title" }}</span></span>
+          </a>
+        </td>
+        <td data-label="Organization"><span class="cell-main">{{ p.current_organization or "—" }}</span></td>
+        <td data-label="Priority"><span class="badge priority-{{ p.priority }}">{{ p.priority|title }}</span></td>
+        <td class="date-cell" data-label="Last contact"><strong>{{ p.last_meaningful_interaction.strftime("%b %-d, %Y") if p.last_meaningful_interaction else "Never" }}</strong></td>
+        <td class="date-cell {{ 'overdue' if p.next_followup < today else 'due' if p.next_followup == today else '' }}" data-label="Next follow-up">
+          {% if p.next_followup < today %}
+            {% set days_overdue = (today - p.next_followup).days %}
+            <strong>{{ days_overdue }} day{{ '' if days_overdue == 1 else 's' }} overdue</strong>
+          {% elif p.next_followup == today %}
+            <strong>Due today</strong>
+          {% else %}
+            <strong>In {{ (p.next_followup - today).days }} days</strong>
+          {% endif %}
+          <span>{{ p.next_followup.strftime("%b %-d, %Y") }}</span>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td class="primary-cell" colspan="5">
+        <div class="empty-state">
+          <div>
+            <span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#check"></use></svg></span>
+            <h3>No follow-ups scheduled</h3>
+            <p>Assign a cadence from a person’s profile or the People directory.</p>
+          </div>
+        </div>
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

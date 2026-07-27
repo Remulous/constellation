@@ -1,13 +1,42 @@
-# Constellation
+<p align="center">
+  <img src="app/static/favicon.svg" width="72" height="72" alt="Constellation logo">
+</p>
 
-A private, single-user personal CRM for deciding who to contact and when. It combines Google Contacts and LinkedIn connection exports with private relationship metadata, interaction history, follow-up cadence, and links into Obsidian.
+<h1 align="center">Constellation</h1>
+
+<p align="center">
+  A private, single-user relationship CRM for deciding who to contact and when.
+</p>
+
+![Constellation dashboard](docs/screenshots/dashboard.jpg)
+
+Constellation combines Google Contacts and LinkedIn connection exports with private relationship metadata, interaction history, follow-up cadence, and links into Obsidian.
+
+> **Privacy by design:** no telemetry, third-party analytics, external AI, outreach automation, email-body storage, or LinkedIn scraping. Your relationship data stays on your instance.
 
 The boundary is deliberate:
 
 - Constellation handles who, when, operational status, source identities, and cadence.
 - Obsidian handles why the relationship matters, meeting notes, background, strategy, and discussion topics.
 
-There is no telemetry, third-party analytics, external AI, outreach automation, email-body storage, or LinkedIn scraping.
+## How it works
+
+1. **Import** Google Contacts and LinkedIn connection snapshots.
+2. **Prioritize** people with private status, tags, priority, and follow-up cadence.
+3. **Follow up** from a focused queue and preserve lightweight interaction history.
+
+<details>
+<summary><strong>More screenshots</strong></summary>
+
+### Relationship directory
+
+![Constellation relationship directory](docs/screenshots/people.jpg)
+
+### Person profile and interaction timeline
+
+![Constellation person profile](docs/screenshots/person.jpg)
+
+</details>
 
 ## Current MVP
 

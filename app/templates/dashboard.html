@@ -1,23 +1,126 @@
 {% extends "base.html" %}{% block title %}Dashboard · Constellation{% endblock %}
 {% block content %}
-<h1>Dashboard</h1>
-<div class="grid cards">
-  <div class="card"><div class="muted">Overdue</div><div class="metric overdue">{{ overdue|length }}</div></div>
-  <div class="card"><div class="muted">Due today</div><div class="metric due">{{ due_today|length }}</div></div>
-  <div class="card"><div class="muted">Due this week</div><div class="metric">{{ due_week|length }}</div></div>
-  <div class="card"><div class="muted">No cadence</div><div class="metric">{{ no_cadence }}</div></div>
-  <div class="card"><div class="muted">Merge reviews</div><div class="metric">{{ pending }}</div></div>
+<header class="page-header">
+  <div>
+    <p class="page-eyebrow">
+      <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#constellation"></use></svg>
+      Your relationship orbit
+    </p>
+    <h1>Good to see you.</h1>
+    <p class="page-description">Here’s who needs attention and what is moving across your network.</p>
+  </div>
+  <div class="actions">
+    <a class="button secondary" href="/people">
+      <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg>
+      Browse people
+    </a>
+    <a class="button" href="/imports">
+      <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#upload"></use></svg>
+      Import contacts
+    </a>
+  </div>
+</header>
+
+<div class="grid cards" aria-label="Relationship overview">
+  <a class="card metric-card attention" href="/follow-ups">
+    <div class="metric-top"><span>Overdue</span><span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#alert"></use></svg></span></div>
+    <div class="metric">{{ overdue|length }}</div>
+    <div class="metric-caption">Need a check-in</div>
+  </a>
+  <a class="card metric-card today" href="/follow-ups">
+    <div class="metric-top"><span>Due today</span><span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#clock"></use></svg></span></div>
+    <div class="metric">{{ due_today|length }}</div>
+    <div class="metric-caption">Ready for today</div>
+  </a>
+  <a class="card metric-card" href="/follow-ups">
+    <div class="metric-top"><span>This week</span><span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#calendar"></use></svg></span></div>
+    <div class="metric">{{ due_week|length }}</div>
+    <div class="metric-caption">Coming up soon</div>
+  </a>
+  <a class="card metric-card" href="/people?sort=followup">
+    <div class="metric-top"><span>No cadence</span><span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg></span></div>
+    <div class="metric">{{ no_cadence }}</div>
+    <div class="metric-caption">Not yet scheduled</div>
+  </a>
+  <a class="card metric-card {{ 'today' if pending else 'clean' }}" href="/merge-review">
+    <div class="metric-top"><span>Merge review</span><span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#merge"></use></svg></span></div>
+    <div class="metric">{{ pending }}</div>
+    <div class="metric-caption">{{ "Awaiting a decision" if pending else "All clear" }}</div>
+  </a>
 </div>
-<div class="two" style="margin-top:1rem">
-  <section class="panel"><h2>Needs attention</h2>
-  {% for p in overdue + due_today + due_week %}
-    <p><a href="/people/{{ p.id }}">{{ p.display_name }}</a><br><span class="{{ 'overdue' if p.next_followup < today else 'muted' }}">{{ p.next_followup }}</span> · {{ p.current_organization or "No organization" }}</p>
-  {% else %}<p class="muted">Nothing due in the next seven days.</p>{% endfor %}
+
+<div class="content-grid" style="margin-top:1rem">
+  <section class="panel">
+    <div class="section-header">
+      <div>
+        <p class="kicker">Priority queue</p>
+        <h2>Needs attention</h2>
+      </div>
+      <a class="section-link" href="/follow-ups">View all <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#arrow-right"></use></svg></a>
+    </div>
+    {% if overdue or due_today or due_week %}
+    <div class="attention-list">
+      {% for p in overdue + due_today + due_week %}
+      <a class="attention-row" href="/people/{{ p.id }}">
+        <span class="avatar" aria-hidden="true">{{ p.display_name[:2] }}</span>
+        <span>
+          <span class="person-name">{{ p.display_name }}</span>
+          <span class="person-meta">
+            <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#building"></use></svg>
+            <span>{{ p.current_organization or "No organization" }}</span>
+          </span>
+        </span>
+        {% if p.next_followup < today %}
+          {% set days_overdue = (today - p.next_followup).days %}
+          <span class="due-label overdue"><strong>{{ days_overdue }} day{{ '' if days_overdue == 1 else 's' }} overdue</strong><small>{{ p.next_followup.strftime("%b %-d") }}</small></span>
+        {% elif p.next_followup == today %}
+          <span class="due-label today"><strong>Due today</strong><small>{{ p.next_followup.strftime("%b %-d") }}</small></span>
+        {% else %}
+          <span class="due-label"><strong>In {{ (p.next_followup - today).days }} days</strong><small>{{ p.next_followup.strftime("%b %-d") }}</small></span>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div>
+        <span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#check"></use></svg></span>
+        <h3>You’re all caught up</h3>
+        <p>Nothing is due in the next seven days. Your relationship queue is clear.</p>
+      </div>
+    </div>
+    {% endif %}
   </section>
-  <section class="panel"><h2>Recently contacted</h2>
-  {% for p in recent %}<p><a href="/people/{{ p.id }}">{{ p.display_name }}</a><br><span class="muted">{{ p.last_meaningful_interaction or "No interaction logged" }}</span></p>
-  {% else %}<p class="muted">No contacts yet. Start with an import.</p>{% endfor %}
+
+  <section class="panel">
+    <div class="section-header">
+      <div>
+        <p class="kicker">Latest activity</p>
+        <h2>Recently contacted</h2>
+      </div>
+    </div>
+    {% if recent %}
+    <div class="contact-list">
+      {% for p in recent %}
+      <a class="contact-row" href="/people/{{ p.id }}">
+        <span class="avatar" aria-hidden="true">{{ p.display_name[:2] }}</span>
+        <span>
+          <span class="person-name">{{ p.display_name }}</span>
+          <span class="person-meta"><span>{{ p.current_organization or "No organization" }}</span></span>
+        </span>
+        <span class="due-label"><strong>{{ p.last_meaningful_interaction.strftime("%b %-d") if p.last_meaningful_interaction else "Never" }}</strong><small>last contact</small></span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state compact">
+      <div>
+        <span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg></span>
+        <h3>No contacts yet</h3>
+        <p>Start with a Google Contacts or LinkedIn import.</p>
+      </div>
+    </div>
+    {% endif %}
   </section>
 </div>
 {% endblock %}
-
