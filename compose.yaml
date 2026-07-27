@@ -1,0 +1,26 @@
+services:
+  constellation:
+    image: constellation:latest
+    container_name: constellation
+    restart: unless-stopped
+    ports:
+      - "${CRM_BIND_ADDRESS:-0.0.0.0}:${CRM_PORT:-8000}:8000"
+    environment:
+      APP_PASSWORD_HASH: "${APP_PASSWORD_HASH:-}"
+      SESSION_SECRET: "${SESSION_SECRET:?Set SESSION_SECRET in Portainer}"
+      SECURE_COOKIES: "${SECURE_COOKIES:-false}"
+      MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-10}"
+      OBSIDIAN_VAULT: "${OBSIDIAN_VAULT:-}"
+      CRM_DATA_DIR: /data
+    volumes:
+      - constellation_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  constellation_data:

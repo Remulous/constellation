@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}Constellation{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+</head>
+<body>
+<nav>
+  <a class="brand" href="/">Constellation</a>
+  <a href="/">Dashboard</a><a href="/people">People</a><a href="/follow-ups">Follow-ups</a><a href="/imports">Imports</a>
+  <a href="/merge-review">Merge review</a><a href="/tags">Tags</a><a href="/settings">Settings</a><a href="/export.csv">Export</a>
+  <form class="inline" action="/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="secondary">Log out</button></form>
+</nav>
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>

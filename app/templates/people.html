@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% block title %}People · Constellation{% endblock %}
+{% block content %}
+<h1>People</h1>
+<form class="filters" method="get">
+  <div><label for="q">Search</label><input id="q" name="q" value="{{ q }}" placeholder="Name, organization, title or email"></div>
+  <div><label for="priority">Priority</label><select id="priority" name="priority"><option value="">All</option>{% for v in ["high","normal","low"] %}<option value="{{ v }}" {{ "selected" if priority == v }}>{{ v|title }}</option>{% endfor %}</select></div>
+  <div><label for="status">Status</label><select id="status" name="status"><option value="">All</option>{% for v in ["active","prospect","customer","partner","dormant"] %}<option value="{{ v }}" {{ "selected" if status == v }}>{{ v|title }}</option>{% endfor %}</select></div>
+  <div><label for="sort">Sort</label><select id="sort" name="sort">{% for v in ["name","organization","followup","recent"] %}<option value="{{ v }}" {{ "selected" if sort == v }}>{{ v|title }}</option>{% endfor %}</select></div>
+  <button>Apply</button>
+</form>
+<form method="post" action="/people/bulk"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<div class="actions">
+  <select name="bulk_action" style="max-width:180px"><option value="tag">Add tag</option><option value="cadence">Set cadence</option></select>
+  <select name="tag_id" style="max-width:220px"><option value="">Choose tag</option>{% for tag in all_tags %}<option value="{{ tag.id }}">{{ tag.name }}</option>{% endfor %}</select>
+  <select name="cadence" style="max-width:180px"><option value="">No cadence</option>{% for v in [14,30,60,90,180] %}<option value="{{ v }}">{{ v }} days</option>{% endfor %}</select>
+  <button>Apply to selected</button>
+</div>
+<div class="table-wrap"><table><thead><tr><th></th><th>Name</th><th>Organization</th><th>Title</th><th>Priority</th><th>Status</th><th>Last contact</th><th>Next follow-up</th><th>Tags</th></tr></thead><tbody>
+{% for p in people %}<tr>
+  <td><input type="checkbox" name="person_ids" value="{{ p.id }}" aria-label="Select {{ p.display_name }}"></td>
+  <td><a href="/people/{{ p.id }}">{{ p.display_name }}</a></td><td>{{ p.current_organization or "—" }}</td><td>{{ p.current_title or "—" }}</td>
+  <td>{{ p.priority }}</td><td>{{ p.relationship_status }}</td><td>{{ p.last_meaningful_interaction or "—" }}</td><td>{{ p.next_followup or "—" }}</td>
+  <td>{% for tag in p.tags %}<span class="badge">{{ tag.name }}</span>{% endfor %}</td>
+</tr>{% else %}<tr><td colspan="9">No people match these filters.</td></tr>{% endfor %}
+</tbody></table></div></form>
+<div class="actions">{% if page > 1 %}<a class="button secondary" href="?q={{ q }}&priority={{ priority }}&status={{ status }}&sort={{ sort }}&page={{ page-1 }}">Previous</a>{% endif %}
+{% if has_next %}<a class="button secondary" href="?q={{ q }}&priority={{ priority }}&status={{ status }}&sort={{ sort }}&page={{ page+1 }}">Next</a>{% endif %}</div>
+{% endblock %}

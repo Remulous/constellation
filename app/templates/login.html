@@ -1,0 +1,7 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Sign in</title><link rel="stylesheet" href="{{ url_for('static', path='app.css') }}"></head>
+<body><main style="max-width:420px"><section class="panel"><h1>Constellation</h1>
+{% if error %}<p class="flash">{{ error }}</p>{% endif %}
+<form method="post"><label for="password">Application password</label><input id="password" name="password" type="password" required autofocus><div class="actions"><button>Sign in</button></div></form>
+</section></main></body></html>
+

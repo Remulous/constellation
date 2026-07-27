@@ -1,0 +1,15 @@
+:root{--bg:#f5f7fa;--panel:#fff;--ink:#172033;--muted:#64748b;--line:#dce3ec;--brand:#254e70;--danger:#b42318;--warn:#b54708}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,sans-serif}
+a{color:#185d8f;text-decoration:none}a:hover{text-decoration:underline}
+nav{background:#14283b;color:#fff;padding:.8rem 1rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap}nav a{color:#dceaf5}nav .brand{font-weight:700;color:#fff;margin-right:auto}
+main{max-width:1180px;margin:1.5rem auto;padding:0 1rem}.grid{display:grid;gap:1rem}.grid.cards{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.card,.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1rem;box-shadow:0 1px 2px #0000000d}.metric{font-size:2rem;font-weight:700}.muted{color:var(--muted)}
+table{width:100%;border-collapse:collapse;background:#fff}th,td{text-align:left;padding:.7rem;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:.8rem;text-transform:uppercase;color:var(--muted)}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}form.inline{display:inline}label{display:block;font-weight:600;margin:.7rem 0 .25rem}
+input,select,textarea,button{font:inherit}input,select,textarea{width:100%;padding:.55rem;border:1px solid #b8c4d1;border-radius:6px;background:#fff}textarea{min-height:100px}
+button,.button{display:inline-block;border:0;border-radius:6px;padding:.58rem .85rem;background:var(--brand);color:#fff;cursor:pointer}.button.secondary,button.secondary{background:#52677a}.button.danger,button.danger{background:var(--danger)}
+.filters{display:grid;grid-template-columns:2fr repeat(3,1fr) auto;gap:.6rem;align-items:end;margin-bottom:1rem}.two{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.badge{display:inline-block;padding:.15rem .45rem;border-radius:999px;background:#e8eef4;font-size:.78rem;margin:.1rem}.overdue{color:var(--danger);font-weight:700}.due{color:var(--warn);font-weight:700}
+.actions{display:flex;gap:.5rem;flex-wrap:wrap;margin:.8rem 0}.flash{padding:.7rem;background:#fee4e2;color:#912018;border-radius:6px}
+@media(max-width:760px){.filters,.two{grid-template-columns:1fr}th:nth-child(n+4),td:nth-child(n+4){display:none}}
+

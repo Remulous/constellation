@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block title %}Imports · Constellation{% endblock %}
+{% block content %}<h1>Imports</h1>
+<section class="panel"><h2>Import a CSV snapshot</h2><p class="muted">CSV contents are parsed and discarded. The original row payload and file hash remain for auditability.</p>
+<form method="post" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><div class="two"><div><label>Provider</label><select name="provider"><option value="google_contacts">Google Contacts</option><option value="linkedin">LinkedIn Connections</option></select></div><div><label>CSV file</label><input type="file" name="csv_file" accept=".csv,text/csv" required></div></div><div class="actions"><button>Import</button></div></form></section>
+<h2>Import history</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Provider</th><th>File</th><th>Status</th><th>Rows</th><th>Created</th><th>Matched</th><th>Review</th></tr></thead><tbody>
+{% for b in batches %}<tr><td>{{ b.imported_at.strftime("%Y-%m-%d %H:%M") }}</td><td>{{ b.provider }}</td><td>{{ b.original_filename }}</td><td>{{ b.status }}</td><td>{{ b.row_count }}</td><td>{{ b.created_contacts }}</td><td>{{ b.exact_matches }}</td><td>{{ b.possible_matches }}</td></tr>{% else %}<tr><td colspan="8">No imports yet.</td></tr>{% endfor %}
+</tbody></table></div>{% endblock %}
+

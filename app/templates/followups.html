@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% block title %}Follow-ups · Constellation{% endblock %}
+{% block content %}<h1>Follow-ups</h1><div class="table-wrap"><table><thead><tr><th>Person</th><th>Organization</th><th>Priority</th><th>Last contact</th><th>Next follow-up</th></tr></thead><tbody>
+{% for p in people %}<tr><td><a href="/people/{{ p.id }}">{{ p.display_name }}</a></td><td>{{ p.current_organization or "—" }}</td><td>{{ p.priority }}</td><td>{{ p.last_meaningful_interaction or "Never" }}</td><td class="{{ 'overdue' if p.next_followup < today else 'due' if p.next_followup == today else '' }}">{{ p.next_followup }}</td></tr>{% else %}<tr><td colspan="5">No follow-ups scheduled.</td></tr>{% endfor %}
+</tbody></table></div>{% endblock %}
+

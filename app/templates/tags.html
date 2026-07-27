@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block title %}Tags · Constellation{% endblock %}
+{% block content %}<h1>Tags</h1><div class="two"><section class="panel"><h2>Add tag or group</h2><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>Name</label><input name="name" required><label>Description</label><textarea name="description"></textarea><div class="actions"><button>Add</button></div></form></section>
+<section class="panel"><h2>Existing tags</h2>{% for tag in tags %}<p><strong>{{ tag.name }}</strong><br><span class="muted">{{ tag.description or "No description" }} · {{ tag.people|length }} people</span></p>{% else %}<p class="muted">No tags yet.</p>{% endfor %}</section></div>{% endblock %}
+

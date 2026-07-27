@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}Dashboard · Constellation{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<div class="grid cards">
+  <div class="card"><div class="muted">Overdue</div><div class="metric overdue">{{ overdue|length }}</div></div>
+  <div class="card"><div class="muted">Due today</div><div class="metric due">{{ due_today|length }}</div></div>
+  <div class="card"><div class="muted">Due this week</div><div class="metric">{{ due_week|length }}</div></div>
+  <div class="card"><div class="muted">No cadence</div><div class="metric">{{ no_cadence }}</div></div>
+  <div class="card"><div class="muted">Merge reviews</div><div class="metric">{{ pending }}</div></div>
+</div>
+<div class="two" style="margin-top:1rem">
+  <section class="panel"><h2>Needs attention</h2>
+  {% for p in overdue + due_today + due_week %}
+    <p><a href="/people/{{ p.id }}">{{ p.display_name }}</a><br><span class="{{ 'overdue' if p.next_followup < today else 'muted' }}">{{ p.next_followup }}</span> · {{ p.current_organization or "No organization" }}</p>
+  {% else %}<p class="muted">Nothing due in the next seven days.</p>{% endfor %}
+  </section>
+  <section class="panel"><h2>Recently contacted</h2>
+  {% for p in recent %}<p><a href="/people/{{ p.id }}">{{ p.display_name }}</a><br><span class="muted">{{ p.last_meaningful_interaction or "No interaction logged" }}</span></p>
+  {% else %}<p class="muted">No contacts yet. Start with an import.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}
+
