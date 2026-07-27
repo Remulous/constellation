@@ -390,7 +390,7 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; background: v
 .people-col-status { width: 5.75rem; }
 .people-col-last-contact { width: 6.8rem; }
 .people-col-followup { width: 7.8rem; }
-.people-col-action { width: 8rem; }
+.people-col-action { width: 9rem; }
 .people-table td[data-label="Organization"] .cell-main {
   overflow: hidden;
   text-overflow: ellipsis;
