@@ -1,26 +1,55 @@
+# Production stack for Portainer.
+#
+# Locally built image + pull_policy: never, Traefik on the external `proxy`
+# network, and manual redeployment.
+#
+# Build on docker-server before deploying:
+#   docker build -t constellation:latest /mnt/steam/projects/constellation
+
 services:
   constellation:
     image: constellation:latest
+    pull_policy: never
     container_name: constellation
     restart: unless-stopped
-    ports:
-      - "${CRM_BIND_ADDRESS:-0.0.0.0}:${CRM_PORT:-8000}:8000"
+
     environment:
-      APP_PASSWORD_HASH: "${APP_PASSWORD_HASH:-}"
-      SESSION_SECRET: "${SESSION_SECRET:?Set SESSION_SECRET in Portainer}"
-      SECURE_COOKIES: "${SECURE_COOKIES:-false}"
-      MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-10}"
-      OBSIDIAN_VAULT: "${OBSIDIAN_VAULT:-}"
+      # Configure these in the Portainer stack environment.
+      APP_PASSWORD_HASH: ${APP_PASSWORD_HASH:-}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in Portainer}
+      SECURE_COOKIES: "true"
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+      OBSIDIAN_VAULT: ${OBSIDIAN_VAULT:-}
       CRM_DATA_DIR: /data
+
     volumes:
-      - constellation_data:/data
+      - type: bind
+        source: /docker/constellation/data
+        target: /data
+
     read_only: true
+
     tmpfs:
       - /tmp:size=64m,mode=1777
+
     security_opt:
       - no-new-privileges:true
+
     cap_drop:
       - ALL
 
-volumes:
-  constellation_data:
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      traefik.http.routers.constellation.entrypoints: https
+      traefik.http.routers.constellation.rule: Host(`constellation.local.remulous-tech.com`)
+      traefik.http.routers.constellation.tls: "true"
+      traefik.http.services.constellation.loadbalancer.server.port: "8000"
+
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    name: proxy
+    external: true
