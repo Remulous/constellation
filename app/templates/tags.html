@@ -2,7 +2,7 @@
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="page-eyebrow"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#tag"></use></svg>Relationship organization</p>
+    <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#tag"></use></svg>Relationship organization</p>
     <h1>Tags</h1>
     <p class="page-description">Create lightweight groups that make your network easier to segment and revisit.</p>
   </div>
@@ -14,7 +14,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label for="name">Name</label><input id="name" name="name" placeholder="e.g. Veterans, Data partners, Close friends" required>
       <label for="description">Description</label><textarea id="description" name="description" placeholder="What does this group represent?"></textarea>
-      <div class="actions"><button type="submit"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#tag"></use></svg>Add tag</button></div>
+      <div class="actions"><button type="submit"><svg class="icon"><use href="/static/icons.svg#tag"></use></svg>Add tag</button></div>
     </form>
   </section>
   <section class="panel">
@@ -25,7 +25,7 @@
       <strong>{{ tag.people|length }} <span class="muted">people</span></strong>
     </div>
     {% else %}
-    <div class="empty-state compact"><div><span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#tag"></use></svg></span><h3>No tags yet</h3><p>Add your first group to organize people across relationship types.</p></div></div>
+    <div class="empty-state compact"><div><span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#tag"></use></svg></span><h3>No tags yet</h3><p>Add your first group to organize people across relationship types.</p></div></div>
     {% endfor %}
   </section>
 </div>

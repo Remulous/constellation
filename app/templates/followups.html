@@ -2,11 +2,11 @@
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="page-eyebrow"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#calendar"></use></svg>Relationship rhythm</p>
+    <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#calendar"></use></svg>Relationship rhythm</p>
     <h1>Follow-ups</h1>
     <p class="page-description">A focused queue of the relationships that are due for attention.</p>
   </div>
-  <a class="button secondary" href="/people?sort=followup"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg>Manage cadences</a>
+  <a class="button secondary" href="/people?sort=followup"><svg class="icon"><use href="/static/icons.svg#people"></use></svg>Manage cadences</a>
 </header>
 
 <div class="table-wrap responsive-table">
@@ -40,7 +40,7 @@
       <tr><td class="primary-cell" colspan="5">
         <div class="empty-state">
           <div>
-            <span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#check"></use></svg></span>
+            <span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#check"></use></svg></span>
             <h3>No follow-ups scheduled</h3>
             <p>Assign a cadence from a person’s profile or the People directory.</p>
           </div>

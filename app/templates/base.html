@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b1220">
   <title>{% block title %}Constellation{% endblock %}</title>
-  <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}" type="image/svg+xml">
-  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
-  <script src="{{ url_for('static', path='app.js') }}" defer></script>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to content</a>
@@ -15,7 +15,7 @@
   <aside class="sidebar" id="app-sidebar">
     <a class="brand-lockup" href="/" aria-label="Constellation dashboard">
       <span class="brand-mark" aria-hidden="true">
-        <svg class="icon icon-xl"><use href="{{ url_for('static', path='icons.svg') }}#constellation"></use></svg>
+        <svg class="icon icon-xl"><use href="/static/icons.svg#constellation"></use></svg>
       </span>
       <span><strong>Constellation</strong><small>Private relationship CRM</small></span>
     </a>
@@ -23,42 +23,42 @@
     <nav class="primary-nav" aria-label="Primary navigation">
       <p class="nav-label">Workspace</p>
       <a class="nav-item {{ 'active' if request.url.path == '/' }}" href="/" {{ 'aria-current="page"' if request.url.path == '/' }}>
-        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#dashboard"></use></svg><span>Dashboard</span>
+        <svg class="icon"><use href="/static/icons.svg#dashboard"></use></svg><span>Dashboard</span>
       </a>
       <a class="nav-item {{ 'active' if request.url.path.startswith('/people') }}" href="/people" {{ 'aria-current="page"' if request.url.path.startswith('/people') }}>
-        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg><span>People</span>
+        <svg class="icon"><use href="/static/icons.svg#people"></use></svg><span>People</span>
       </a>
       <a class="nav-item {{ 'active' if request.url.path.startswith('/follow-ups') }}" href="/follow-ups" {{ 'aria-current="page"' if request.url.path.startswith('/follow-ups') }}>
-        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#calendar"></use></svg><span>Follow-ups</span>
+        <svg class="icon"><use href="/static/icons.svg#calendar"></use></svg><span>Follow-ups</span>
       </a>
 
       <p class="nav-label">Data</p>
       <a class="nav-item {{ 'active' if request.url.path.startswith('/imports') }}" href="/imports" {{ 'aria-current="page"' if request.url.path.startswith('/imports') }}>
-        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#upload"></use></svg><span>Imports</span>
+        <svg class="icon"><use href="/static/icons.svg#upload"></use></svg><span>Imports</span>
       </a>
       <a class="nav-item {{ 'active' if request.url.path.startswith('/merge-review') }}" href="/merge-review" {{ 'aria-current="page"' if request.url.path.startswith('/merge-review') }}>
-        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#merge"></use></svg><span>Merge review</span>
+        <svg class="icon"><use href="/static/icons.svg#merge"></use></svg><span>Merge review</span>
       </a>
       <a class="nav-item {{ 'active' if request.url.path.startswith('/tags') }}" href="/tags" {{ 'aria-current="page"' if request.url.path.startswith('/tags') }}>
-        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#tag"></use></svg><span>Tags</span>
+        <svg class="icon"><use href="/static/icons.svg#tag"></use></svg><span>Tags</span>
       </a>
     </nav>
 
     <div class="sidebar-footer">
       <a class="nav-item {{ 'active' if request.url.path.startswith('/settings') }}" href="/settings" {{ 'aria-current="page"' if request.url.path.startswith('/settings') }}>
-        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#settings"></use></svg><span>Settings</span>
+        <svg class="icon"><use href="/static/icons.svg#settings"></use></svg><span>Settings</span>
       </a>
       <a class="nav-item" href="/export.csv">
-        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#download"></use></svg><span>Export CSV</span>
+        <svg class="icon"><use href="/static/icons.svg#download"></use></svg><span>Export CSV</span>
       </a>
       <form action="/logout" method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button class="nav-item nav-button" type="submit">
-          <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#logout"></use></svg><span>Log out</span>
+          <svg class="icon"><use href="/static/icons.svg#logout"></use></svg><span>Log out</span>
         </button>
       </form>
       <div class="privacy-note">
-        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#shield"></use></svg>
+        <svg class="icon"><use href="/static/icons.svg#shield"></use></svg>
         <span>Local, private, and yours</span>
       </div>
     </div>
@@ -69,11 +69,11 @@
   <div class="workspace">
     <header class="mobile-header">
       <a class="mobile-brand" href="/">
-        <svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#constellation"></use></svg>
+        <svg class="icon icon-lg"><use href="/static/icons.svg#constellation"></use></svg>
         <span>Constellation</span>
       </a>
       <button class="icon-button" type="button" data-sidebar-toggle aria-controls="app-sidebar" aria-expanded="false" aria-label="Open navigation">
-        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#menu"></use></svg>
+        <svg class="icon"><use href="/static/icons.svg#menu"></use></svg>
       </button>
     </header>
     <main id="main-content">{% block content %}{% endblock %}</main>

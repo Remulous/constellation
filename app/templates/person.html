@@ -21,17 +21,17 @@
     {% for identity in person.identities %}
       {% if identity.provider == "linkedin" and identity.profile_url %}
       <a class="button secondary" target="_blank" rel="noopener" href="{{ identity.profile_url }}">
-        <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#linkedin"></use></svg>LinkedIn
+        <svg class="icon"><use href="/static/icons.svg#linkedin"></use></svg>LinkedIn
       </a>
       {% endif %}
     {% endfor %}
     {% if person.obsidian_uri %}
     <a class="button secondary" href="{{ person.obsidian_uri }}">
-      <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#note"></use></svg>Obsidian
+      <svg class="icon"><use href="/static/icons.svg#note"></use></svg>Obsidian
     </a>
     {% endif %}
     <a class="button" href="#log-interaction">
-      <svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#edit"></use></svg>Log interaction
+      <svg class="icon"><use href="/static/icons.svg#edit"></use></svg>Log interaction
     </a>
   </div>
 </section>
@@ -74,7 +74,7 @@
       <div class="timeline">
         {% for i in person.interactions|sort(attribute="interaction_date", reverse=true) %}
         <article class="timeline-entry">
-          <span class="timeline-dot" aria-hidden="true"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#note"></use></svg></span>
+          <span class="timeline-dot" aria-hidden="true"><svg class="icon"><use href="/static/icons.svg#note"></use></svg></span>
           <div class="timeline-body">
             <div class="timeline-title">
               <strong>{{ i.interaction_type }}</strong>
@@ -90,7 +90,7 @@
       {% else %}
       <div class="empty-state compact">
         <div>
-          <span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#note"></use></svg></span>
+          <span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#note"></use></svg></span>
           <h3>No interactions logged</h3>
           <p>Add the first touchpoint to begin this relationship timeline.</p>
         </div>
@@ -99,7 +99,7 @@
     </section>
 
     <details class="panel details-panel">
-      <summary><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#edit"></use></svg>Edit CRM details</summary>
+      <summary><svg class="icon"><use href="/static/icons.svg#edit"></use></svg>Edit CRM details</summary>
       <div class="details-body">
         <form method="post" action="/people/{{ person.id }}/edit">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -126,7 +126,7 @@
     <section class="panel followup-card">
       <div class="panel-header">
         <div><p class="kicker">Relationship rhythm</p><h2>Follow-up</h2></div>
-        <span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#calendar"></use></svg></span>
+        <span class="metric-icon"><svg class="icon"><use href="/static/icons.svg#calendar"></use></svg></span>
       </div>
       <div class="followup-summary">
         <div class="followup-stat"><span>Last meaningful</span><strong>{{ person.last_meaningful_interaction.strftime("%b %-d, %Y") if person.last_meaningful_interaction else "Never" }}</strong></div>
@@ -148,7 +148,7 @@
       <div class="panel-header"><div><h2>Contact methods</h2><p>Imported ways to reach this person.</p></div></div>
       {% for m in person.methods %}
       <div class="contact-method">
-        <span class="contact-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#{{ 'people' if m.method_type == 'phone' else 'note' }}"></use></svg></span>
+        <span class="contact-icon"><svg class="icon"><use href="/static/icons.svg#{{ 'people' if m.method_type == 'phone' else 'note' }}"></use></svg></span>
         <p><strong>{{ m.value }}</strong><br><span class="muted">{{ m.method_type|title }}{% if m.label %} · {{ m.label }}{% endif %}{% if m.source %} · {{ m.source|replace("_", " ")|title }}{% endif %}</span></p>
       </div>
       {% else %}
@@ -167,7 +167,7 @@
     </section>
 
     <details class="panel details-panel danger-zone">
-      <summary><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#alert"></use></svg>Archive person</summary>
+      <summary><svg class="icon"><use href="/static/icons.svg#alert"></use></svg>Archive person</summary>
       <div class="details-body">
         <p class="muted">Archiving removes this person from active views without deleting their history.</p>
         <form method="post" action="/people/{{ person.id }}/followup">

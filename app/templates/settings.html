@@ -2,19 +2,19 @@
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="page-eyebrow"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#settings"></use></svg>System configuration</p>
+    <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#settings"></use></svg>System configuration</p>
     <h1>Settings</h1>
     <p class="page-description">A read-only view of the privacy and deployment settings active in this instance.</p>
   </div>
 </header>
 <section class="panel">
-  <div class="panel-header"><div><h2>Runtime configuration</h2><p>Secrets remain environment-based and never enter the CRM database.</p></div><span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#shield"></use></svg></span></div>
+  <div class="panel-header"><div><h2>Runtime configuration</h2><p>Secrets remain environment-based and never enter the CRM database.</p></div><span class="metric-icon"><svg class="icon"><use href="/static/icons.svg#shield"></use></svg></span></div>
   <div class="settings-list">
     <div class="settings-row"><span>Password protection</span><span class="status-pill {{ 'status-active' if password_enabled else 'status-dormant' }}">{{ "Enabled" if password_enabled else "Disabled" }}</span></div>
     <div class="settings-row"><span>Secure cookies</span><span class="status-pill {{ 'status-active' if secure_cookies else 'status-dormant' }}">{{ "Enabled" if secure_cookies else "Disabled" }}</span></div>
     <div class="settings-row"><span>Maximum upload</span><strong>{{ upload_limit }} MB</strong></div>
     <div class="settings-row"><span>Default Obsidian vault</span><strong>{{ obsidian_vault or "Not configured" }}</strong></div>
   </div>
-  <div class="notice" style="margin-top:1rem"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#settings"></use></svg><span>Change these values in <code>.env</code>, then restart the container to apply them.</span></div>
+  <div class="notice" style="margin-top:1rem"><svg class="icon"><use href="/static/icons.svg#settings"></use></svg><span>Change these values in <code>.env</code>, then restart the container to apply them.</span></div>
 </section>
 {% endblock %}

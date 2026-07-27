@@ -2,7 +2,7 @@
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="page-eyebrow"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#upload"></use></svg>Data intake</p>
+    <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#upload"></use></svg>Data intake</p>
     <h1>Imports</h1>
     <p class="page-description">Bring in a fresh Google Contacts or LinkedIn snapshot while preserving your private CRM fields.</p>
   </div>
@@ -11,7 +11,7 @@
 <section class="panel" style="margin-bottom:1rem">
   <div class="panel-header">
     <div><h2>Import a CSV snapshot</h2><p>Source contents are processed locally and the uploaded file is discarded.</p></div>
-    <span class="metric-icon"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#shield"></use></svg></span>
+    <span class="metric-icon"><svg class="icon"><use href="/static/icons.svg#shield"></use></svg></span>
   </div>
   <form method="post" enctype="multipart/form-data">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -19,9 +19,9 @@
       <div><label for="provider">Provider</label><select id="provider" name="provider"><option value="google_contacts">Google Contacts</option><option value="linkedin">LinkedIn Connections</option></select></div>
       <div><label for="csv_file">CSV file</label><input id="csv_file" type="file" name="csv_file" accept=".csv,text/csv" required></div>
     </div>
-    <div class="actions"><button type="submit"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#upload"></use></svg>Import snapshot</button></div>
+    <div class="actions"><button type="submit"><svg class="icon"><use href="/static/icons.svg#upload"></use></svg>Import snapshot</button></div>
   </form>
-  <div class="notice"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#shield"></use></svg><span>The original row payload and file hash remain for auditability. Re-importing does not overwrite private notes, tags, priority, status, or cadence.</span></div>
+  <div class="notice"><svg class="icon"><use href="/static/icons.svg#shield"></use></svg><span>The original row payload and file hash remain for auditability. Re-importing does not overwrite private notes, tags, priority, status, or cadence.</span></div>
 </section>
 
 <section>
@@ -39,7 +39,7 @@
           <td data-label="Rows">{{ b.row_count }}</td><td data-label="Created">{{ b.created_contacts }}</td><td data-label="Matched">{{ b.exact_matches }}</td><td data-label="Review">{{ b.possible_matches }}</td>
         </tr>
       {% else %}
-        <tr><td class="primary-cell" colspan="8"><div class="empty-state"><div><span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#upload"></use></svg></span><h3>No imports yet</h3><p>Your completed import snapshots will appear here.</p></div></div></td></tr>
+        <tr><td class="primary-cell" colspan="8"><div class="empty-state"><div><span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#upload"></use></svg></span><h3>No imports yet</h3><p>Your completed import snapshots will appear here.</p></div></div></td></tr>
       {% endfor %}
       </tbody>
     </table>

@@ -2,11 +2,11 @@
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="page-eyebrow"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg>Relationship directory</p>
+    <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#people"></use></svg>Relationship directory</p>
     <h1>People</h1>
     <p class="page-description">Search your network, understand relationship status, and keep follow-ups moving.</p>
   </div>
-  <a class="button" href="/imports"><svg class="icon"><use href="{{ url_for('static', path='icons.svg') }}#upload"></use></svg>Import contacts</a>
+  <a class="button" href="/imports"><svg class="icon"><use href="/static/icons.svg#upload"></use></svg>Import contacts</a>
 </header>
 
 <section class="panel filter-panel">
@@ -75,7 +75,7 @@
         <tr><td class="primary-cell" colspan="8">
           <div class="empty-state">
             <div>
-              <span class="empty-mark"><svg class="icon icon-lg"><use href="{{ url_for('static', path='icons.svg') }}#people"></use></svg></span>
+              <span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#people"></use></svg></span>
               <h3>No people found</h3>
               <p>{{ "Try adjusting your search or filters." if q or priority or status else "Import contacts to begin building your relationship directory." }}</p>
             </div>
