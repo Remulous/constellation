@@ -382,6 +382,25 @@ textarea { min-height: 108px; resize: vertical; }
 
 .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
 table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); }
+.people-table { min-width: 1060px; table-layout: fixed; }
+.people-col-select { width: 3rem; }
+.people-col-name { width: 24%; }
+.people-col-organization { width: 15%; }
+.people-col-priority { width: 5.5rem; }
+.people-col-status { width: 5.75rem; }
+.people-col-last-contact { width: 6.8rem; }
+.people-col-followup { width: 7.8rem; }
+.people-col-action { width: 8rem; }
+.people-table td[data-label="Organization"] .cell-main {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.people-table td.wide-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.people-table .row-actions { justify-content: flex-start; }
 th, td { padding: .72rem .75rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
 th {
   position: sticky;
@@ -750,6 +769,8 @@ tbody tr:last-child td { border-bottom: 0; }
   .bulk-toolbar select { max-width: none; }
   .responsive-table { overflow: visible; border: 0; background: transparent; box-shadow: none; }
   .responsive-table table, .responsive-table tbody { display: block; }
+  .responsive-table .people-table { min-width: 0; table-layout: auto; }
+  .responsive-table .people-table colgroup { display: none; }
   .responsive-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .responsive-table tr { position: relative; display: grid; grid-template-columns: 1fr 1fr; margin-bottom: .7rem; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
   .responsive-table td { display: block; padding: .65rem .75rem; border: 0; border-top: 1px solid var(--line); }
