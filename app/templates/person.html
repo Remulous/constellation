@@ -52,12 +52,13 @@
       </div>
       <form class="interaction-form" method="post" action="/people/{{ person.id }}/interactions">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="return_to" value="/people/{{ person.id }}">
         <div class="interaction-fields">
           <div>
             <label for="interaction_type">Type</label>
             <select id="interaction_type" name="interaction_type">{% for v in ["Email","LinkedIn","Phone call","Text message","Meeting","In-person","Introduction","Note","Other"] %}<option>{{ v }}</option>{% endfor %}</select>
           </div>
-          <div><label for="interaction_date">Date</label><input id="interaction_date" type="date" name="interaction_date" required></div>
+          <div><label for="interaction_date">Date</label><input id="interaction_date" type="date" name="interaction_date" value="{{ now_date.isoformat() if now_date else '' }}" required></div>
           <div><label for="direction">Direction</label><select id="direction" name="direction"><option value="">N/A</option><option>inbound</option><option>outbound</option></select></div>
           <div>
             <label>Follow-up impact</label>

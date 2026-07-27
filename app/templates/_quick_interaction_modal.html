@@ -1,0 +1,39 @@
+<dialog class="quick-dialog" data-interaction-dialog aria-labelledby="quick-interaction-title">
+  <form method="post" data-interaction-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="return_to" value="" data-return-to>
+    <div class="dialog-header">
+      <div>
+        <p class="kicker">Quick capture</p>
+        <h2 id="quick-interaction-title">Log interaction</h2>
+        <p class="muted" data-interaction-person></p>
+      </div>
+      <button class="button quiet small" type="button" data-dialog-close aria-label="Close">Close</button>
+    </div>
+    <div class="quick-interaction-grid">
+      <div>
+        <label for="quick-type">Type</label>
+        <select id="quick-type" name="interaction_type">{% for v in ["Email","LinkedIn","Phone call","Text message","Meeting","In-person","Introduction","Note","Other"] %}<option>{{ v }}</option>{% endfor %}</select>
+      </div>
+      <div>
+        <label for="quick-date">Date</label>
+        <input id="quick-date" type="date" name="interaction_date" value="{{ today.isoformat() }}" required>
+      </div>
+      <div>
+        <label for="quick-direction">Direction</label>
+        <select id="quick-direction" name="direction"><option value="">N/A</option><option value="inbound">Inbound</option><option value="outbound">Outbound</option></select>
+      </div>
+      <div>
+        <label for="quick-followup">Next follow-up</label>
+        <input id="quick-followup" type="date" name="next_followup">
+      </div>
+    </div>
+    <label for="quick-summary">What happened?</label>
+    <textarea id="quick-summary" name="summary" placeholder="A short note about what matters next"></textarea>
+    <label class="checkbox-label"><input type="checkbox" name="meaningful" value="true" checked> Meaningful interaction</label>
+    <div class="actions dialog-actions">
+      <button type="submit">Save interaction</button>
+      <button class="secondary" type="button" data-dialog-close>Cancel</button>
+    </div>
+  </form>
+</dialog>

@@ -5,7 +5,7 @@ import io
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
@@ -17,12 +17,36 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.database import Base, engine, get_db
-from app.models import ExternalIdentity, ImportBatch, Interaction, MergeCandidate, MergeHistory, Person, Tag
+from app.models import (
+    ContactMethod,
+    Employment,
+    ExternalIdentity,
+    ImportBatch,
+    Interaction,
+    MergeCandidate,
+    MergeHistory,
+    Person,
+    Tag,
+)
 from app.security import csrf_token, safe_csv_cell, verify_csrf, verify_password
 from app.services.followups import refresh_followup
 from app.services.imports import import_csv
 
 BASE = Path(__file__).parent
+PEOPLE_BATCH_SIZE = 100
+MERGE_FIELDS = (
+    "display_name", "primary_email", "primary_phone", "current_organization",
+    "current_title", "location", "priority", "relationship_status",
+    "followup_interval_days", "general_note", "obsidian_uri",
+)
+PERSON_SNAPSHOT_FIELDS = (
+    "display_name", "first_name", "middle_name", "last_name", "preferred_name",
+    "primary_email", "primary_phone", "current_organization", "current_title",
+    "location", "relationship_status", "priority", "followup_interval_days",
+    "last_meaningful_interaction", "next_followup", "followup_override",
+    "followup_snoozed_until", "cadence_paused", "obsidian_uri", "general_note",
+    "created_at", "updated_at", "archived_at",
+)
 
 
 @asynccontextmanager
@@ -122,9 +146,21 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 @app.get("/people", response_class=HTMLResponse)
 def people(
     request: Request, q: str = "", priority: str = "", status: str = "",
-    sort: str = "name", page: int = 1, db: Session = Depends(get_db),
+    sort: str = "name", db: Session = Depends(get_db),
 ):
-    page = max(1, page)
+    stmt, order = people_statement(q, priority, status, sort)
+    total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
+    rows = db.scalars(stmt.order_by(*order).limit(PEOPLE_BATCH_SIZE + 1)).all()
+    has_next = len(rows) > PEOPLE_BATCH_SIZE
+    next_url = people_rows_url(q, priority, status, sort, PEOPLE_BATCH_SIZE) if has_next else ""
+    all_tags = db.scalars(select(Tag).order_by(Tag.name)).all()
+    return templates.TemplateResponse("people.html", context(
+        request, people=rows[:PEOPLE_BATCH_SIZE], q=q, priority=priority, status=status,
+        sort=sort, total=total, next_url=next_url, all_tags=all_tags, today=date.today(),
+    ))
+
+
+def people_statement(q: str, priority: str, status: str, sort: str):
     stmt = select(Person).where(Person.archived_at.is_(None)).options(selectinload(Person.tags))
     if q:
         term = f"%{q.strip()}%"
@@ -137,17 +173,36 @@ def people(
     if status:
         stmt = stmt.where(Person.relationship_status == status)
     order = {
-        "name": Person.display_name,
-        "organization": Person.current_organization,
-        "followup": Person.next_followup,
-        "recent": Person.updated_at.desc(),
-    }.get(sort, Person.display_name)
-    rows = db.scalars(stmt.order_by(order).offset((page - 1) * 50).limit(51)).all()
-    has_next = len(rows) > 50
-    all_tags = db.scalars(select(Tag).order_by(Tag.name)).all()
-    return templates.TemplateResponse("people.html", context(
-        request, people=rows[:50], q=q, priority=priority, status=status,
-        sort=sort, page=page, has_next=has_next, all_tags=all_tags, today=date.today(),
+        "name": (Person.display_name, Person.id),
+        "organization": (Person.current_organization.asc().nullslast(), Person.display_name, Person.id),
+        "followup": (Person.next_followup.asc().nullslast(), Person.display_name, Person.id),
+        "recent": (Person.updated_at.desc(), Person.display_name, Person.id),
+    }.get(sort, (Person.display_name, Person.id))
+    return stmt, order
+
+
+def people_rows_url(q: str, priority: str, status: str, sort: str, offset: int) -> str:
+    return "/people/rows?" + urlencode({
+        "q": q, "priority": priority, "status": status, "sort": sort, "offset": offset,
+    })
+
+
+@app.get("/people/rows", response_class=HTMLResponse)
+def people_rows(
+    request: Request, q: str = "", priority: str = "", status: str = "",
+    sort: str = "name", offset: int = 0, db: Session = Depends(get_db),
+):
+    offset = max(0, offset)
+    stmt, order = people_statement(q, priority, status, sort)
+    rows = db.scalars(
+        stmt.order_by(*order).offset(offset).limit(PEOPLE_BATCH_SIZE + 1)
+    ).all()
+    has_next = len(rows) > PEOPLE_BATCH_SIZE
+    next_url = people_rows_url(
+        q, priority, status, sort, offset + PEOPLE_BATCH_SIZE
+    ) if has_next else ""
+    return templates.TemplateResponse("people_rows.html", context(
+        request, people=rows[:PEOPLE_BATCH_SIZE], next_url=next_url, today=date.today(),
     ))
 
 
@@ -195,7 +250,9 @@ def get_person(db: Session, person_id: str) -> Person:
 def person_detail(request: Request, person_id: str, db: Session = Depends(get_db)):
     person = get_person(db, person_id)
     all_tags = db.scalars(select(Tag).order_by(Tag.name)).all()
-    return templates.TemplateResponse("person.html", context(request, person=person, all_tags=all_tags))
+    return templates.TemplateResponse("person.html", context(
+        request, person=person, all_tags=all_tags, now_date=date.today(),
+    ))
 
 
 @app.post("/people/{person_id}/edit")
@@ -227,6 +284,7 @@ def add_interaction(
     request: Request, person_id: str, interaction_type: str = Form(...),
     interaction_date: date = Form(...), summary: str = Form(""),
     direction: str = Form(""), meaningful: bool = Form(False),
+    next_followup: date | None = Form(None), return_to: str = Form(""),
     db: Session = Depends(get_db), _csrf: None = Depends(require_csrf),
 ):
     person = get_person(db, person_id)
@@ -241,8 +299,12 @@ def add_interaction(
         person.followup_override = None
         person.followup_snoozed_until = None
         refresh_followup(person)
+    if next_followup:
+        person.followup_override = next_followup
+        refresh_followup(person)
     db.commit()
-    return RedirectResponse(f"/people/{person.id}", status_code=303)
+    destination = return_to if return_to.startswith("/") and not return_to.startswith("//") else f"/people/{person.id}"
+    return RedirectResponse(destination, status_code=303)
 
 
 @app.post("/people/{person_id}/followup")
@@ -297,13 +359,70 @@ def merge_review(request: Request, db: Session = Depends(get_db)):
     for candidate in candidates:
         identity = db.get(ExternalIdentity, candidate.source_identity_id)
         rows.append((candidate, db.get(Person, identity.person_id), db.get(Person, candidate.candidate_person_id)))
-    return templates.TemplateResponse("merge.html", context(request, rows=rows))
+    history = db.scalars(
+        select(MergeHistory)
+        .where(MergeHistory.undone_at.is_(None))
+        .order_by(MergeHistory.merged_at.desc())
+        .limit(10)
+    ).all()
+    return templates.TemplateResponse("merge.html", context(
+        request, rows=rows, history=history, merge_fields=MERGE_FIELDS,
+    ))
 
 
-def merge_people(db: Session, survivor: Person, duplicate: Person) -> None:
+def _snapshot_value(value):
+    return value.isoformat() if isinstance(value, (date, datetime)) else value
+
+
+def _person_fields(person: Person) -> dict:
+    return {field: _snapshot_value(getattr(person, field)) for field in PERSON_SNAPSHOT_FIELDS}
+
+
+def _restore_person_fields(person: Person, values: dict) -> None:
+    date_fields = {
+        "last_meaningful_interaction", "next_followup",
+        "followup_override", "followup_snoozed_until",
+    }
+    datetime_fields = {"created_at", "updated_at", "archived_at"}
+    for field in PERSON_SNAPSHOT_FIELDS:
+        value = values.get(field)
+        if value and field in date_fields:
+            value = date.fromisoformat(value)
+        elif value and field in datetime_fields:
+            value = datetime.fromisoformat(value)
+        setattr(person, field, value)
+
+
+def _method_snapshot(method: ContactMethod) -> dict:
+    return {
+        "id": method.id,
+        "method_type": method.method_type,
+        "value": method.value,
+        "normalized_value": method.normalized_value,
+        "label": method.label,
+        "source": method.source,
+        "primary": method.primary,
+        "verified": method.verified,
+    }
+
+
+def merge_people(
+    db: Session,
+    survivor: Person,
+    duplicate: Person,
+    candidate: MergeCandidate | None = None,
+    selected_values: dict | None = None,
+) -> None:
     snapshot = {
-        "id": duplicate.id, "display_name": duplicate.display_name,
-        "organization": duplicate.current_organization, "title": duplicate.current_title,
+        "duplicate": _person_fields(duplicate),
+        "survivor": _person_fields(survivor),
+        "methods": [_method_snapshot(method) for method in duplicate.methods],
+        "identity_ids": [identity.id for identity in duplicate.identities],
+        "employment_ids": [employment.id for employment in duplicate.employments],
+        "interaction_ids": [interaction.id for interaction in duplicate.interactions],
+        "duplicate_tag_ids": [tag.id for tag in duplicate.tags],
+        "survivor_tag_ids": [tag.id for tag in survivor.tags],
+        "candidate_person_id": candidate.candidate_person_id if candidate else None,
     }
     existing_methods = {(m.method_type, m.normalized_value) for m in survivor.methods}
     for method in list(duplicate.methods):
@@ -331,13 +450,21 @@ def merge_people(db: Session, survivor: Person, duplicate: Person) -> None:
         not survivor.last_meaningful_interaction or duplicate.last_meaningful_interaction > survivor.last_meaningful_interaction
     ):
         survivor.last_meaningful_interaction = duplicate.last_meaningful_interaction
-    db.add(MergeHistory(survivor_person_id=survivor.id, merged_person_id=duplicate.id, snapshot=snapshot))
+    for field, value in (selected_values or {}).items():
+        if field in MERGE_FIELDS:
+            setattr(survivor, field, value)
+    db.add(MergeHistory(
+        survivor_person_id=survivor.id,
+        merged_person_id=duplicate.id,
+        candidate_id=candidate.id if candidate else None,
+        snapshot=snapshot,
+    ))
     db.delete(duplicate)
     refresh_followup(survivor)
 
 
 @app.post("/merge-review/{candidate_id}")
-def resolve_merge(
+async def resolve_merge(
     request: Request, candidate_id: int, action: str = Form(...),
     survivor_id: str = Form(""), db: Session = Depends(get_db),
     _csrf: None = Depends(require_csrf),
@@ -351,17 +478,79 @@ def resolve_merge(
     if action == "approve":
         survivor = source if survivor_id == source.id else target
         duplicate = target if survivor is source else source
+        form = await request.form()
+        selected_values = {}
+        for field in MERGE_FIELDS:
+            selected_person = source if form.get(f"field_{field}") == source.id else target
+            selected_values[field] = getattr(selected_person, field)
+        merge_people(db, survivor, duplicate, candidate, selected_values)
         candidate.status = "approved"
         candidate.resolved_at = datetime.now(timezone.utc)
         if candidate.candidate_person_id == duplicate.id:
             candidate.candidate_person_id = survivor.id
-        db.flush()
-        merge_people(db, survivor, duplicate)
     elif action in {"rejected", "ignored"}:
         candidate.status = action
         candidate.resolved_at = datetime.now(timezone.utc)
     else:
         raise HTTPException(400)
+    db.commit()
+    return RedirectResponse("/merge-review", status_code=303)
+
+
+@app.post("/merge-history/{history_id}/undo")
+def undo_merge(
+    request: Request, history_id: int, db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    history = db.get(MergeHistory, history_id)
+    if not history or history.undone_at is not None:
+        raise HTTPException(404)
+    if "duplicate" not in history.snapshot:
+        raise HTTPException(409, "This legacy merge predates undo support")
+    if db.get(Person, history.merged_person_id):
+        raise HTTPException(409, "Merged person already exists")
+    survivor = get_person(db, history.survivor_person_id)
+    snapshot = history.snapshot
+
+    duplicate = Person(id=history.merged_person_id, display_name=snapshot["duplicate"]["display_name"])
+    _restore_person_fields(duplicate, snapshot["duplicate"])
+    db.add(duplicate)
+    db.flush()
+
+    for method_data in snapshot.get("methods", []):
+        method = db.get(ContactMethod, method_data["id"])
+        if method:
+            method.person_id = duplicate.id
+        else:
+            db.add(ContactMethod(person_id=duplicate.id, **method_data))
+    for model, key in (
+        (ExternalIdentity, "identity_ids"),
+        (Employment, "employment_ids"),
+        (Interaction, "interaction_ids"),
+    ):
+        for item_id in snapshot.get(key, []):
+            item = db.get(model, item_id)
+            if item:
+                item.person_id = duplicate.id
+
+    duplicate.tags = [
+        tag for tag_id in snapshot.get("duplicate_tag_ids", [])
+        if (tag := db.get(Tag, tag_id))
+    ]
+    _restore_person_fields(survivor, snapshot["survivor"])
+    survivor.tags = [
+        tag for tag_id in snapshot.get("survivor_tag_ids", [])
+        if (tag := db.get(Tag, tag_id))
+    ]
+
+    if history.candidate_id:
+        candidate = db.get(MergeCandidate, history.candidate_id)
+        if candidate:
+            candidate.status = "pending"
+            candidate.resolved_at = None
+            if snapshot.get("candidate_person_id"):
+                candidate.candidate_person_id = snapshot["candidate_person_id"]
+    history.undone_at = datetime.now(timezone.utc)
     db.commit()
     return RedirectResponse("/merge-review", status_code=303)
 
@@ -413,5 +602,6 @@ def settings_page(request: Request):
     return templates.TemplateResponse("settings.html", context(
         request, password_enabled=bool(settings.app_password_hash),
         secure_cookies=settings.secure_cookies, upload_limit=settings.max_upload_mb,
-        obsidian_vault=settings.obsidian_vault,
+        obsidian_vault=settings.obsidian_vault, mcp_enabled=bool(settings.mcp_api_token),
+        public_url=settings.public_url,
     ))

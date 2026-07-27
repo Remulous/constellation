@@ -12,7 +12,7 @@
 
 Constellation combines Google Contacts and LinkedIn connection exports with private relationship metadata, interaction history, follow-up cadence, and links into Obsidian.
 
-> **Privacy by design:** no telemetry, third-party analytics, external AI, outreach automation, email-body storage, or LinkedIn scraping. Your relationship data stays on your instance.
+> **Privacy by design:** no telemetry, third-party analytics, outreach automation, email-body storage, or LinkedIn scraping. The optional ChatGPT MCP connector is disabled by default and only returns records requested through its read-only tools.
 
 The boundary is deliberate:
 
@@ -47,13 +47,16 @@ The boundary is deliberate:
 - No automatic name-only merges
 - Manual merge review that preserves contact methods, identities, interactions, employment, and tags
 - Auditable import batches, duplicate-file idempotency, and LinkedIn snapshot status
-- Search, filters, sorting, pagination, bulk tagging, and bulk cadence assignment
+- Search, filters, sorting, continuous scrolling, bulk tagging, and bulk cadence assignment
 - Due, overdue, and upcoming follow-up views
 - Meaningful interaction logging and follow-up recalculation
+- Quick interaction logging from People and Follow-ups
 - Manual scheduling, snoozing, cadence pausing in the data model, and archiving
 - Obsidian URI storage and helper endpoint
 - CSV export with spreadsheet-formula-injection protection
 - Optional Argon2 password authentication and CSRF protection
+- Optional bearer-protected, read-only ChatGPT MCP connector
+- Field-by-field merge decisions and one-click undo for new merges
 - SQLite backup and restore scripts
 - Non-root, read-only Docker deployment
 
@@ -75,6 +78,13 @@ SQLAlchemy 2 + SQLite
   |- contact methods and employment
   |- interactions, tags, merge review/history
   `- import batches
+
+ChatGPT
+  |
+Private tunnel + bearer token
+  |
+Read-only MCP service
+  `- bounded relationship tools
 ```
 
 Provider-specific parsing ends at `ImportedRecord`. Matching and persistence operate on that normalized record, which is the seam intended for a future Google People API adapter.
@@ -136,6 +146,8 @@ The container runs database migrations at startup. SQLite lives in the `constell
 | `SECURE_COOKIES` | Sends session cookie only over HTTPS | `true` |
 | `MAX_UPLOAD_MB` | Maximum accepted CSV size | `10` |
 | `OBSIDIAN_VAULT` | Default vault for URI construction | empty |
+| `PUBLIC_URL` | Canonical contact-link URL and allowed MCP host | `http://localhost:8000` |
+| `MCP_API_TOKEN` | Enables and protects the read-only MCP service | empty/disabled |
 | `CRM_DATA_DIR` | Database and default backup directory | `/data` |
 | `DATABASE_URL` | Optional SQLAlchemy override, mainly for development | derived from data dir |
 | `CRM_BIND_ADDRESS` | Docker host interface published by Compose | `0.0.0.0` |
@@ -195,9 +207,33 @@ Source data may add or refresh imported contact details. Re-import does not over
 
 ## Merge review
 
-Open **Merge review** to compare uncertain matches. Approving a merge lets you choose the surviving person. Alternate contact methods, external identities, employment, interactions, and tags are reassigned rather than discarded. A merge-history snapshot records the removed person’s basic identity.
+Open **Merge review** to compare uncertain matches. Approving a merge lets you choose the surviving person and the preferred value for each scalar field. Alternate contact methods, external identities, employment, interactions, and tags are reassigned rather than discarded. A complete merge-history snapshot supports one-click undo for new merges.
 
-The current MVP records merge history but does not expose a one-click undo UI. Restoring a pre-merge database backup is the reliable undo path.
+Legacy merge-history entries remain visible but cannot be undone automatically. Restoring a pre-merge database backup remains the recovery path for those entries.
+
+## ChatGPT MCP connector
+
+Constellation includes a separate, read-only MCP service at:
+
+```text
+https://your-constellation-host/mcp
+```
+
+It exposes four bounded tools: `search_people`, `get_person`, `list_followups`, and `relationship_overview`. The connector cannot execute arbitrary SQL or modify records. Results are capped, and contact results link back to the canonical Constellation record.
+
+Generate a dedicated token:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Set `MCP_API_TOKEN` and `PUBLIC_URL` in the Portainer stack environment, rebuild the image, and recreate both Compose services. Configure the MCP client to send:
+
+```text
+Authorization: Bearer YOUR_MCP_API_TOKEN
+```
+
+ChatGPT connects to remote MCP endpoints. For a private homelab deployment, use OpenAI's Secure MCP Tunnel rather than exposing Constellation directly to the public internet. Only records retrieved for a question are returned through the connector, but those returned fields leave the local instance and are processed by the connected ChatGPT service.
 
 ## Follow-ups
 
@@ -274,7 +310,6 @@ Alembic applies schema upgrades during startup.
 
 - Google and LinkedIn formats change; inspect and extend header aliases when an actual export contains new columns.
 - Google addresses, birthdays, labels, notes, and websites remain in the preserved source payload but do not yet have dedicated editing UI.
-- The merge screen chooses the surviving record and preserves collections, but does not yet offer per-field selection or one-click undo.
 - Imported professional changes are added to employment history; the UI does not yet provide a full employment editor.
 - Application settings are environment-based rather than editable in the browser.
 - No live Google synchronization or outbound communication exists.

@@ -182,5 +182,7 @@ class MergeHistory(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     survivor_person_id: Mapped[str] = mapped_column(String(36), index=True)
     merged_person_id: Mapped[str] = mapped_column(String(36), index=True)
+    candidate_id: Mapped[int | None] = mapped_column(Integer, index=True)
     snapshot: Mapped[dict] = mapped_column(JSON)
     merged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
