@@ -14,7 +14,7 @@ def test_mutation_requires_valid_csrf(db):
         with TestClient(app, base_url="https://testserver") as client:
             assert client.post("/tags", data={"name": "Nope"}).status_code == 422
             page = client.get("/tags")
-            assert 'href="/static/app.css"' in page.text
+            assert 'href="/static/app.css?v=' in page.text
             assert 'href="/static/icons.svg#tag"' in page.text
             token = re.search(r'name="csrf_token" value="([^"]+)"', page.text).group(1)
             response = client.post("/tags", data={"name": "VetBiz", "csrf_token": token}, follow_redirects=False)

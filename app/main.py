@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
@@ -34,6 +35,10 @@ from app.services.followups import refresh_followup
 from app.services.imports import import_csv
 
 BASE = Path(__file__).parent
+ASSET_VERSION = hashlib.sha256(
+    (BASE / "static" / "app.css").read_bytes()
+    + (BASE / "static" / "app.js").read_bytes()
+).hexdigest()[:12]
 PEOPLE_BATCH_SIZE = 100
 SEGMENT_FILTER_KEYS = ("q", "priority", "status", "tag", "followup", "sort")
 MERGE_FIELDS = (
@@ -88,7 +93,12 @@ app.add_middleware(
 
 
 def context(request: Request, **values):
-    return {"request": request, "csrf_token": csrf_token(request.session), **values}
+    return {
+        "request": request,
+        "csrf_token": csrf_token(request.session),
+        "asset_version": ASSET_VERSION,
+        **values,
+    }
 
 
 def require_csrf(request: Request, supplied: str = Form(..., alias="csrf_token")) -> None:
