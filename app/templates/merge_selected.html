@@ -1,0 +1,56 @@
+{% extends "base.html" %}{% block title %}Merge selected profiles · Constellation{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#merge"></use></svg>Manual merge</p>
+    <h1>Compare selected profiles</h1>
+    <p class="page-description">Choose the canonical record and the preferred value for each field. Nothing is merged until you confirm.</p>
+  </div>
+  <div class="actions"><a class="button secondary" href="/people">Cancel</a></div>
+</header>
+
+<section class="panel merge-card">
+  <div class="panel-header">
+    <div><p class="kicker">Manually selected pair</p><h2>{{ source.display_name }} and {{ target.display_name }}</h2></div>
+  </div>
+  <form method="post" action="/people/merge-selected">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="person_ids" value="{{ source.id }}">
+    <input type="hidden" name="person_ids" value="{{ target.id }}">
+    <div class="merge-survivor">
+      <div>
+        <label for="survivor">Canonical record</label>
+        <select id="survivor" name="survivor_id">
+          <option value="{{ source.id }}">{{ source.display_name }}</option>
+          <option value="{{ target.id }}">{{ target.display_name }}</option>
+        </select>
+      </div>
+      <p class="muted">All identities, contact methods, employment, interactions, and tags are preserved. This merge can be undone from Merge review.</p>
+    </div>
+
+    <div class="merge-field-table">
+      <div class="merge-field-heading"><span>Field</span><span>{{ source.display_name }}</span><span>{{ target.display_name }}</span></div>
+      {% for field in merge_fields %}
+      {% set source_value = source|attr(field) %}
+      {% set target_value = target|attr(field) %}
+      <div class="merge-field-row">
+        <strong>{{ field.replace("_", " ")|title }}</strong>
+        <label class="merge-choice">
+          <input type="radio" name="field_{{ field }}" value="{{ source.id }}" {{ "checked" if source_value or not target_value }}>
+          <span>{{ source_value if source_value is not none and source_value != "" else "—" }}</span>
+        </label>
+        <label class="merge-choice">
+          <input type="radio" name="field_{{ field }}" value="{{ target.id }}" {{ "checked" if not source_value and target_value }}>
+          <span>{{ target_value if target_value is not none and target_value != "" else "—" }}</span>
+        </label>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="actions">
+      <button type="submit"><svg class="icon"><use href="/static/icons.svg#merge"></use></svg>Merge selected profiles</button>
+      <a class="button secondary" href="/people">Cancel</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

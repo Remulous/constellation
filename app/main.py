@@ -329,7 +329,31 @@ def bulk_people(
     cadence: int | None = Form(None), db: Session = Depends(get_db),
     _csrf: None = Depends(require_csrf),
 ):
-    people = db.scalars(select(Person).where(Person.id.in_(person_ids))).all() if person_ids else []
+    unique_person_ids = list(dict.fromkeys(person_ids))
+    people = (
+        db.scalars(
+            select(Person).where(
+                Person.id.in_(unique_person_ids),
+                Person.archived_at.is_(None),
+            )
+        ).all()
+        if unique_person_ids
+        else []
+    )
+    if bulk_action == "merge":
+        if len(unique_person_ids) != 2 or len(people) != 2:
+            raise HTTPException(400, "Select exactly two active people to merge.")
+        people_by_id = {person.id: person for person in people}
+        source, target = (people_by_id[person_id] for person_id in unique_person_ids)
+        return templates.TemplateResponse(
+            "merge_selected.html",
+            context(
+                request,
+                source=source,
+                target=target,
+                merge_fields=MERGE_FIELDS,
+            ),
+        )
     if bulk_action == "tag" and tag_id:
         tag = db.get(Tag, tag_id)
         if tag:
@@ -342,6 +366,90 @@ def bulk_people(
             refresh_followup(person)
     db.commit()
     return RedirectResponse("/people", status_code=303)
+
+
+@app.post("/people/merge-selected")
+async def merge_selected_people(
+    request: Request,
+    person_ids: list[str] = Form(default=[]),
+    survivor_id: str = Form(...),
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    unique_person_ids = list(dict.fromkeys(person_ids))
+    if len(unique_person_ids) != 2 or survivor_id not in unique_person_ids:
+        raise HTTPException(400, "A merge requires exactly two selected people.")
+    people = db.scalars(
+        select(Person).where(
+            Person.id.in_(unique_person_ids),
+            Person.archived_at.is_(None),
+        )
+    ).all()
+    if len(people) != 2:
+        raise HTTPException(404, "One of the selected people no longer exists.")
+    people_by_id = {person.id: person for person in people}
+    survivor = people_by_id[survivor_id]
+    duplicate = next(
+        person for person in people if person.id != survivor.id
+    )
+    form = await request.form()
+    selected_values = {}
+    for field in MERGE_FIELDS:
+        selected_id = str(form.get(f"field_{field}", survivor.id))
+        selected_person = people_by_id.get(selected_id, survivor)
+        selected_values[field] = getattr(selected_person, field)
+
+    pending_candidates = db.scalars(
+        select(MergeCandidate).where(MergeCandidate.status == "pending")
+    ).all()
+    candidate_snapshots = []
+    for merge_candidate in pending_candidates:
+        identity = db.get(ExternalIdentity, merge_candidate.source_identity_id)
+        source_person_id = (
+            survivor.id
+            if identity and identity.person_id == duplicate.id
+            else identity.person_id if identity else None
+        )
+        new_candidate_person_id = (
+            survivor.id
+            if merge_candidate.candidate_person_id == duplicate.id
+            else merge_candidate.candidate_person_id
+        )
+        becomes_self_match = source_person_id == new_candidate_person_id
+        if (
+            new_candidate_person_id != merge_candidate.candidate_person_id
+            or becomes_self_match
+        ):
+            candidate_snapshots.append(
+                {
+                    "id": merge_candidate.id,
+                    "candidate_person_id": merge_candidate.candidate_person_id,
+                    "status": merge_candidate.status,
+                    "resolved_at": _snapshot_value(merge_candidate.resolved_at),
+                }
+            )
+        if merge_candidate.candidate_person_id == duplicate.id:
+            merge_candidate.candidate_person_id = survivor.id
+        if becomes_self_match:
+            merge_candidate.status = "ignored"
+            merge_candidate.resolved_at = datetime.now(timezone.utc)
+
+    merge_people(db, survivor, duplicate, selected_values=selected_values)
+    history = next(
+        item
+        for item in db.new
+        if isinstance(item, MergeHistory)
+        and item.survivor_person_id == survivor.id
+        and item.merged_person_id == duplicate.id
+    )
+    history.snapshot = {
+        **history.snapshot,
+        "merge_candidates": candidate_snapshots,
+    }
+    db.commit()
+    return RedirectResponse(
+        f"/people/{survivor.id}?merged=1", status_code=303
+    )
 
 
 @app.get("/follow-ups", response_class=HTMLResponse)
@@ -1162,6 +1270,17 @@ def undo_merge(
             candidate.resolved_at = None
             if snapshot.get("candidate_person_id"):
                 candidate.candidate_person_id = snapshot["candidate_person_id"]
+    for candidate_data in snapshot.get("merge_candidates", []):
+        merge_candidate = db.get(MergeCandidate, candidate_data["id"])
+        if not merge_candidate:
+            continue
+        merge_candidate.candidate_person_id = candidate_data["candidate_person_id"]
+        merge_candidate.status = candidate_data["status"]
+        merge_candidate.resolved_at = (
+            datetime.fromisoformat(candidate_data["resolved_at"])
+            if candidate_data.get("resolved_at")
+            else None
+        )
     history.undone_at = datetime.now(timezone.utc)
     db.commit()
     return RedirectResponse("/merge-review", status_code=303)

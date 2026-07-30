@@ -8,7 +8,15 @@ from sqlalchemy import select
 
 from app.database import get_db
 from app.main import app
-from app.models import ContactMethod, ExternalIdentity, Interaction, Person, SavedSegment, Tag
+from app.models import (
+    ContactMethod,
+    ExternalIdentity,
+    Interaction,
+    MergeHistory,
+    Person,
+    SavedSegment,
+    Tag,
+)
 
 
 def csrf_token(html: str) -> str:
@@ -137,6 +145,92 @@ def test_person_linkedin_profile_can_be_added_and_removed(db):
             )
             db.expire_all()
             assert db.get(ExternalIdentity, identity.id).active is False
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_two_selected_people_can_be_reviewed_and_merged(db):
+    canonical = Person(
+        display_name="Avery Stone",
+        primary_email="avery@example.test",
+    )
+    duplicate = Person(
+        display_name="Avery J. Stone",
+        current_organization="Stone Works",
+    )
+    duplicate.methods.append(
+        ContactMethod(
+            method_type="phone",
+            value="757-555-0101",
+            normalized_value="17575550101",
+        )
+    )
+    db.add_all([canonical, duplicate])
+    db.commit()
+    duplicate_id = duplicate.id
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        with TestClient(app, base_url="https://testserver") as client:
+            people = client.get("/people")
+            token = csrf_token(people.text)
+            assert "Merge two profiles" in people.text
+
+            invalid = client.post(
+                "/people/bulk",
+                data={
+                    "csrf_token": token,
+                    "bulk_action": "merge",
+                    "person_ids": canonical.id,
+                },
+            )
+            assert invalid.status_code == 400
+
+            review = client.post(
+                "/people/bulk",
+                data={
+                    "csrf_token": token,
+                    "bulk_action": "merge",
+                    "person_ids": [canonical.id, duplicate.id],
+                },
+            )
+            assert review.status_code == 200
+            assert "Compare selected profiles" in review.text
+            assert canonical.display_name in review.text
+            assert duplicate.display_name in review.text
+
+            merged = client.post(
+                "/people/merge-selected",
+                data={
+                    "csrf_token": token,
+                    "person_ids": [canonical.id, duplicate.id],
+                    "survivor_id": canonical.id,
+                    "field_display_name": canonical.id,
+                    "field_current_organization": duplicate.id,
+                },
+                follow_redirects=False,
+            )
+            assert merged.status_code == 303
+            assert merged.headers["location"].endswith("?merged=1")
+            db.expire_all()
+            survivor = db.get(Person, canonical.id)
+            assert db.get(Person, duplicate_id) is None
+            assert survivor.current_organization == "Stone Works"
+            assert {method.normalized_value for method in survivor.methods} == {
+                "17575550101"
+            }
+            history = db.scalar(select(MergeHistory))
+            assert history.survivor_person_id == canonical.id
+            assert history.merged_person_id == duplicate_id
+
+            undone = client.post(
+                f"/merge-history/{history.id}/undo",
+                data={"csrf_token": token},
+                follow_redirects=False,
+            )
+            assert undone.status_code == 303
+            db.expire_all()
+            assert db.get(Person, duplicate_id) is not None
+            assert db.get(MergeHistory, history.id).undone_at is not None
     finally:
         app.dependency_overrides.clear()
 
