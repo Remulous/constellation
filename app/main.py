@@ -20,19 +20,36 @@ from app.config import settings
 from app.database import Base, engine, get_db
 from app.models import (
     ContactMethod,
+    ConnectionSuggestion,
     Employment,
     ExternalIdentity,
+    FollowUpSuggestion,
     ImportBatch,
     Interaction,
     MergeCandidate,
     MergeHistory,
+    Opportunity,
+    Organization,
     Person,
+    RelationshipSignal,
     SavedSegment,
     Tag,
+    VetBizImportCandidate,
+    VetBizImportRecord,
 )
 from app.security import csrf_token, safe_csv_cell, verify_csrf, verify_password
 from app.services.followups import refresh_followup
 from app.services.imports import import_csv
+from app.services.vetbiz_imports import (
+    EDITABLE_FIELDS,
+    VetBizImportError,
+    approve_safe_interactions,
+    commit_reviewed_import,
+    create_reviewed_import,
+    propose_connection_suggestion,
+    propose_opportunity_from_signal,
+    update_candidate,
+)
 
 BASE = Path(__file__).parent
 ASSET_VERSION = hashlib.sha256(
@@ -479,6 +496,323 @@ async def upload_import(
         raise HTTPException(413, "Upload too large")
     import_csv(db, provider, Path(csv_file.filename or "upload.csv").name, data)
     return RedirectResponse("/imports", status_code=303)
+
+
+VETBIZ_GROUPS = (
+    ("contacts", "Contacts", {"new_contact", "contact_update"}),
+    ("organizations", "Organizations", {"organization"}),
+    ("interactions", "Meeting interactions", {"interaction"}),
+    ("signals", "Offers and asks", {"signal"}),
+    ("follow_ups", "Follow-up suggestions", {"follow_up"}),
+    ("opportunities", "Possible Remulous Labs opportunities", {"opportunity"}),
+    ("connections", "Possible introductions", {"connection_suggestion"}),
+)
+
+
+def _vetbiz_import_context(
+    request: Request,
+    db: Session,
+    record: VetBizImportRecord,
+    error: str = "",
+    notice: str = "",
+):
+    candidates = db.scalars(
+        select(VetBizImportCandidate)
+        .where(VetBizImportCandidate.import_record_id == record.id)
+        .order_by(VetBizImportCandidate.id)
+    ).all()
+    grouped = []
+    for key, label, candidate_types in VETBIZ_GROUPS:
+        rows = [
+            candidate
+            for candidate in candidates
+            if candidate.candidate_type in candidate_types
+        ]
+        if rows:
+            grouped.append((key, label, rows))
+    matched_people = {
+        candidate.matched_entity_id: db.get(Person, candidate.matched_entity_id)
+        for candidate in candidates
+        if candidate.matched_entity_id
+        and candidate.candidate_type != "organization"
+    }
+    prior = db.get(VetBizImportRecord, record.revision_of_id) if record.revision_of_id else None
+    counts = {
+        status: sum(candidate.status == status for candidate in candidates)
+        for status in ("pending", "edited", "approved", "rejected", "committed")
+    }
+    contact_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate.candidate_type in {"new_contact", "contact_update"}
+    ]
+    return context(
+        request,
+        record=record,
+        grouped=grouped,
+        matched_people=matched_people,
+        prior=prior,
+        counts=counts,
+        editable_fields=EDITABLE_FIELDS,
+        contact_candidates=contact_candidates,
+        error=error,
+        notice=notice,
+    )
+
+
+@app.get("/vetbiz-imports", response_class=HTMLResponse)
+def vetbiz_imports_page(request: Request, db: Session = Depends(get_db)):
+    records = db.scalars(
+        select(VetBizImportRecord)
+        .order_by(VetBizImportRecord.imported_at.desc())
+        .limit(50)
+    ).all()
+    return templates.TemplateResponse(
+        "vetbiz_imports.html",
+        context(
+            request,
+            records=records,
+            max_minutes_upload_mb=settings.max_minutes_upload_mb,
+        ),
+    )
+
+
+@app.post("/vetbiz-imports")
+async def upload_vetbiz_import(
+    request: Request,
+    review_confirmed: bool = Form(False),
+    review_notes: str = Form(""),
+    minutes_text: str = Form(""),
+    minutes_file: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    filename = "pasted-vetbiz-minutes.txt"
+    data = minutes_text.encode("utf-8") if minutes_text.strip() else b""
+    limit = settings.max_minutes_upload_mb * 1024 * 1024
+    if minutes_file and minutes_file.filename:
+        filename = Path(minutes_file.filename).name
+        data = await minutes_file.read(limit + 1)
+    try:
+        creation = create_reviewed_import(
+            db,
+            filename,
+            data,
+            review_confirmed=review_confirmed,
+            review_notes=review_notes,
+            max_bytes=limit,
+        )
+    except VetBizImportError as exc:
+        records = db.scalars(
+            select(VetBizImportRecord)
+            .order_by(VetBizImportRecord.imported_at.desc())
+            .limit(50)
+        ).all()
+        return templates.TemplateResponse(
+            "vetbiz_imports.html",
+            context(
+                request,
+                records=records,
+                max_minutes_upload_mb=settings.max_minutes_upload_mb,
+                error=str(exc),
+            ),
+            status_code=400,
+        )
+    suffix = "?duplicate=1" if creation.exact_duplicate else (
+        "?revision=1" if creation.revision_warning else ""
+    )
+    return RedirectResponse(
+        f"/vetbiz-imports/{creation.record.id}{suffix}", status_code=303
+    )
+
+
+@app.get("/vetbiz-imports/{import_id}", response_class=HTMLResponse)
+def vetbiz_import_review(
+    request: Request, import_id: int, db: Session = Depends(get_db)
+):
+    record = db.get(VetBizImportRecord, import_id)
+    if not record:
+        raise HTTPException(404, "Reviewed-minutes import not found")
+    notice = ""
+    if request.query_params.get("duplicate"):
+        notice = "This exact document was already imported. No duplicate candidates were created."
+    elif request.query_params.get("revision"):
+        notice = "The meeting metadata matches an earlier import. Review this document as a possible revision."
+    elif request.query_params.get("saved"):
+        notice = "Candidate decision saved."
+    elif request.query_params.get("bulk"):
+        notice = "Safe exact-email meeting interactions were approved."
+    elif request.query_params.get("committed"):
+        notice = "Approved changes were committed atomically."
+    return templates.TemplateResponse(
+        "vetbiz_import_review.html",
+        _vetbiz_import_context(request, db, record, notice=notice),
+    )
+
+
+@app.post("/vetbiz-imports/{import_id}/candidates/{candidate_id}")
+async def decide_vetbiz_candidate(
+    request: Request,
+    import_id: int,
+    candidate_id: int,
+    action: str = Form(...),
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    candidate = db.get(VetBizImportCandidate, candidate_id)
+    if not candidate or candidate.import_record_id != import_id:
+        raise HTTPException(404, "Import candidate not found")
+    form = await request.form()
+    submitted = {
+        key: str(form.get(key, ""))
+        for key in EDITABLE_FIELDS.get(candidate.candidate_type, set())
+    }
+    matched_entity_id = str(
+        form.get("matched_entity_id", candidate.matched_entity_id or "")
+    )
+    try:
+        update_candidate(
+            candidate,
+            action,
+            submitted,
+            matched_entity_id=matched_entity_id,
+            resolution_notes=str(form.get("resolution_notes", "")),
+        )
+        db.commit()
+    except VetBizImportError as exc:
+        db.rollback()
+        record = db.get(VetBizImportRecord, import_id)
+        return templates.TemplateResponse(
+            "vetbiz_import_review.html",
+            _vetbiz_import_context(request, db, record, error=str(exc)),
+            status_code=400,
+        )
+    return RedirectResponse(
+        f"/vetbiz-imports/{import_id}?saved=1", status_code=303
+    )
+
+
+@app.post("/vetbiz-imports/{import_id}/approve-safe")
+def bulk_approve_vetbiz_interactions(
+    request: Request,
+    import_id: int,
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    record = db.get(VetBizImportRecord, import_id)
+    if not record:
+        raise HTTPException(404, "Reviewed-minutes import not found")
+    approve_safe_interactions(record)
+    db.commit()
+    return RedirectResponse(f"/vetbiz-imports/{import_id}?bulk=1", status_code=303)
+
+
+@app.post("/vetbiz-imports/{import_id}/candidates/{candidate_id}/opportunity")
+def convert_vetbiz_signal_to_opportunity(
+    request: Request,
+    import_id: int,
+    candidate_id: int,
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    record = db.get(VetBizImportRecord, import_id)
+    signal_candidate = db.get(VetBizImportCandidate, candidate_id)
+    if not record or not signal_candidate:
+        raise HTTPException(404, "Reviewed-minutes import or signal not found")
+    try:
+        propose_opportunity_from_signal(record, signal_candidate)
+        db.commit()
+    except VetBizImportError as exc:
+        db.rollback()
+        return templates.TemplateResponse(
+            "vetbiz_import_review.html",
+            _vetbiz_import_context(request, db, record, error=str(exc)),
+            status_code=400,
+        )
+    return RedirectResponse(
+        f"/vetbiz-imports/{import_id}?saved=1#opportunities", status_code=303
+    )
+
+
+@app.post("/vetbiz-imports/{import_id}/connection-suggestions")
+def create_vetbiz_connection_suggestion(
+    request: Request,
+    import_id: int,
+    source_candidate_id: int = Form(...),
+    target_candidate_id: int = Form(...),
+    reason: str = Form(...),
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    record = db.get(VetBizImportRecord, import_id)
+    source_contact = db.get(VetBizImportCandidate, source_candidate_id)
+    target_contact = db.get(VetBizImportCandidate, target_candidate_id)
+    if not record or not source_contact or not target_contact:
+        raise HTTPException(404, "Reviewed-minutes import or contact proposal not found")
+    try:
+        propose_connection_suggestion(
+            record, source_contact, target_contact, reason
+        )
+        db.commit()
+    except VetBizImportError as exc:
+        db.rollback()
+        return templates.TemplateResponse(
+            "vetbiz_import_review.html",
+            _vetbiz_import_context(request, db, record, error=str(exc)),
+            status_code=400,
+        )
+    return RedirectResponse(
+        f"/vetbiz-imports/{import_id}?saved=1#connections", status_code=303
+    )
+
+
+@app.post("/vetbiz-imports/{import_id}/metadata")
+def update_vetbiz_import_metadata(
+    request: Request,
+    import_id: int,
+    meeting_title: str = Form(...),
+    meeting_date: date = Form(...),
+    review_notes: str = Form(""),
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    record = db.get(VetBizImportRecord, import_id)
+    if not record:
+        raise HTTPException(404, "Reviewed-minutes import not found")
+    if record.import_status == "committed":
+        raise HTTPException(400, "Committed import metadata cannot be changed")
+    title = meeting_title.strip()
+    if not title:
+        raise HTTPException(400, "Meeting title is required")
+    record.meeting_title = title[:300]
+    record.meeting_date = meeting_date
+    record.review_notes = review_notes.strip()[:2000] or None
+    db.commit()
+    return RedirectResponse(f"/vetbiz-imports/{import_id}?saved=1", status_code=303)
+
+
+@app.post("/vetbiz-imports/{import_id}/commit")
+def commit_vetbiz_import(
+    request: Request,
+    import_id: int,
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    record = db.get(VetBizImportRecord, import_id)
+    if not record:
+        raise HTTPException(404, "Reviewed-minutes import not found")
+    try:
+        commit_reviewed_import(db, record)
+    except VetBizImportError as exc:
+        record = db.get(VetBizImportRecord, import_id)
+        return templates.TemplateResponse(
+            "vetbiz_import_review.html",
+            _vetbiz_import_context(request, db, record, error=str(exc)),
+            status_code=400,
+        )
+    return RedirectResponse(
+        f"/vetbiz-imports/{import_id}?committed=1", status_code=303
+    )
 
 
 @app.get("/merge-review", response_class=HTMLResponse)

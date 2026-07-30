@@ -644,6 +644,40 @@ tbody tr:last-child td { border-bottom: 0; }
 .flash { margin-bottom: 1rem; padding: .75rem .9rem; border: 1px solid #f0c6c6; border-radius: var(--radius-sm); background: var(--danger-soft); color: #9c2d2d; }
 .notice { display: flex; align-items: flex-start; gap: .65rem; padding: .8rem; border-radius: .7rem; background: var(--surface-soft); color: var(--muted); font-size: .82rem; }
 .notice .icon { margin-top: .1rem; color: var(--success); }
+.vetbiz-confirmation { margin-top: .85rem; }
+.vetbiz-notice, .vetbiz-warning { margin-bottom: 1rem; }
+.vetbiz-warning { background: var(--warning-soft); color: #854d0e; }
+.vetbiz-warning .icon { color: var(--warning); }
+.vetbiz-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .7rem; margin-bottom: 1rem; }
+.vetbiz-summary .summary-tile { display: grid; gap: .15rem; padding: .8rem 1rem; }
+.vetbiz-summary .summary-tile strong { font-size: 1.35rem; }
+.vetbiz-provenance { margin-bottom: 1rem; }
+.vetbiz-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin: 0 0 1rem; }
+.vetbiz-facts > div { padding: .75rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-soft); }
+.vetbiz-facts .wide { grid-column: 1 / -1; }
+.vetbiz-facts dt { color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.vetbiz-facts dd { margin: .2rem 0 0; overflow-wrap: anywhere; }
+.vetbiz-source { margin-top: .8rem; }
+.vetbiz-source pre { max-height: 420px; margin: .8rem 0 0; overflow: auto; color: #334155; font: .76rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; }
+.vetbiz-review-actions { position: sticky; z-index: 8; top: .75rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: 1rem 0; padding: .75rem; border: 1px solid var(--line-strong); border-radius: var(--radius); background: rgb(255 255 255 / .95); box-shadow: var(--shadow-md); backdrop-filter: blur(12px); }
+.vetbiz-review-actions form { margin: 0; }
+.vetbiz-candidate-group { margin-top: 1.4rem; }
+.vetbiz-candidate-list { display: grid; gap: .8rem; }
+.vetbiz-candidate { border-left: 4px solid var(--line-strong); }
+.vetbiz-candidate.status-approved { border-left-color: var(--primary); }
+.vetbiz-candidate.status-edited { border-left-color: var(--warning); }
+.vetbiz-candidate.status-rejected { opacity: .72; border-left-color: var(--danger); }
+.vetbiz-candidate.status-committed { border-left-color: var(--success); }
+.vetbiz-candidate-header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .8rem; }
+.vetbiz-candidate-header > div { display: flex; align-items: center; gap: .55rem; }
+.vetbiz-review-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(240px, .6fr); gap: 1rem; padding: .8rem; border-radius: var(--radius-sm); background: var(--surface-soft); }
+.vetbiz-review-grid p { margin-bottom: .4rem; }
+.vetbiz-review-grid blockquote { margin: 0; color: #334155; white-space: pre-wrap; }
+.vetbiz-candidate-form { margin-top: .8rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+.vetbiz-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 .75rem; }
+.vetbiz-fields .wide { grid-column: 1 / -1; }
+.vetbiz-committed-result { display: flex; align-items: baseline; gap: .6rem; margin-top: .8rem; padding: .75rem; border-radius: var(--radius-sm); background: var(--success-soft); color: var(--success); }
+.vetbiz-committed-result p { flex-basis: 100%; margin: 0; }
 .login-shell { display: grid; min-height: calc(100vh - 7rem); place-items: center; }
 .login-card { width: min(420px, 100%); padding: 1.5rem; }
 .login-brand { display: grid; justify-items: center; margin-bottom: 1.3rem; text-align: center; }
@@ -771,6 +805,11 @@ tbody tr:last-child td { border-bottom: 0; }
   .quality-person { grid-template-columns: 1fr auto; }
   .quality-person > div { grid-column: 1 / -1; grid-row: 2; }
   .bulk-toolbar { align-items: stretch; flex-direction: column; }
+  .vetbiz-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vetbiz-facts, .vetbiz-review-grid, .vetbiz-fields { grid-template-columns: 1fr; }
+  .vetbiz-fields .wide, .vetbiz-facts .wide { grid-column: auto; }
+  .vetbiz-review-actions { position: static; align-items: stretch; flex-direction: column; }
+  .vetbiz-review-actions form, .vetbiz-review-actions button { width: 100%; }
   .bulk-toolbar select { max-width: none; }
   .responsive-table { overflow: visible; border: 0; background: transparent; box-shadow: none; }
   .responsive-table table, .responsive-table tbody { display: block; }

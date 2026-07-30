@@ -13,6 +13,7 @@ class Settings:
     session_secret: str = os.getenv("SESSION_SECRET", "change-me-in-production")
     secure_cookies: bool = os.getenv("SECURE_COOKIES", "true").lower() == "true"
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "10"))
+    max_minutes_upload_mb: int = int(os.getenv("MAX_MINUTES_UPLOAD_MB", "16"))
     obsidian_vault: str = os.getenv("OBSIDIAN_VAULT", "")
     public_url: str = os.getenv("PUBLIC_URL", "http://localhost:8000").rstrip("/")
     mcp_api_token: str = os.getenv("MCP_API_TOKEN", "")
