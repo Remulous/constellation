@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}VetBiz Minutes Import · Constellation{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#upload"></use></svg>Reviewed source workflow</p>
+    <h1>VetBiz Minutes Import</h1>
+    <p class="page-description">Turn finalized, human-reviewed meeting minutes into sourced proposals. Nothing changes durable contact or opportunity data until you approve it.</p>
+  </div>
+</div>
+
+{% if error %}<div class="flash" role="alert">{{ error }}</div>{% endif %}
+
+<section class="panel">
+  <div class="panel-header">
+    <div><h2>Upload reviewed minutes</h2><p>Version 1 accepts Markdown, plain text, and text-based RTF. Raw recordings, transcripts, OCR, DOCX, and PDF are out of scope.</p></div>
+  </div>
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="two">
+      <div>
+        <label for="minutes_file">Reviewed document</label>
+        <input id="minutes_file" type="file" name="minutes_file" accept=".md,.markdown,.txt,.rtf,text/plain,text/markdown,application/rtf">
+        <p class="field-help">Maximum {{ max_minutes_upload_mb }} MB. Uploaded files are converted to safe local text; embedded RTF content is ignored or rejected.</p>
+      </div>
+      <div>
+        <label for="review_notes">Review confirmation notes</label>
+        <input id="review_notes" name="review_notes" placeholder="Example: Final minutes reviewed by the meeting scribe">
+      </div>
+    </div>
+    <label for="minutes_text">Or paste finalized minutes</label>
+    <textarea id="minutes_text" name="minutes_text" placeholder="Paste reviewed Markdown or plain text here"></textarea>
+    <label class="checkbox-label vetbiz-confirmation">
+      <input type="checkbox" name="review_confirmed" value="true" required>
+      I confirm this document contains finalized or human-reviewed meeting minutes.
+    </label>
+    <div class="actions"><button type="submit"><svg class="icon"><use href="/static/icons.svg#upload"></use></svg>Parse for review</button></div>
+  </form>
+  <div class="notice">
+    <svg class="icon"><use href="/static/icons.svg#shield"></use></svg>
+    <span>Parsing creates only an import record and review candidates. Contacts, interactions, signals, opportunities, follow-ups, and introduction suggestions require explicit approval and a separate atomic commit.</span>
+  </div>
+</section>
+
+<section>
+  <div class="section-header"><div><p class="kicker">Audit trail</p><h2>Reviewed-minutes history</h2></div></div>
+  <div class="table-wrap responsive-table">
+    <table>
+      <thead><tr><th>Meeting</th><th>Source</th><th>Imported</th><th>Status</th><th>Revision</th><th>Review</th></tr></thead>
+      <tbody>
+      {% for record in records %}
+        <tr>
+          <td class="primary-cell" data-label="Meeting"><a class="cell-main" href="/vetbiz-imports/{{ record.id }}">{{ record.meeting_title }}</a><span class="cell-sub">{{ record.meeting_date.strftime("%b %-d, %Y") }}</span></td>
+          <td data-label="Source"><span class="cell-main">{{ record.filename }}</span></td>
+          <td class="date-cell" data-label="Imported"><strong>{{ record.imported_at.strftime("%b %-d, %Y") }}</strong><span>{{ record.imported_at.strftime("%-I:%M %p") }}</span></td>
+          <td data-label="Status"><span class="status-pill status-{{ 'active' if record.import_status == 'committed' else 'prospect' }}">{{ record.import_status|replace("_", " ")|title }}</span></td>
+          <td data-label="Revision">{{ "Import #" ~ record.revision_of_id if record.revision_of_id else "—" }}</td>
+          <td data-label="Review"><a class="button secondary small" href="/vetbiz-imports/{{ record.id }}">Open</a></td>
+        </tr>
+      {% else %}
+        <tr><td class="primary-cell" colspan="6"><div class="empty-state compact"><div><span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#upload"></use></svg></span><h3>No reviewed minutes imported</h3><p>Upload a finalized VetBiz document to create a review queue.</p></div></div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

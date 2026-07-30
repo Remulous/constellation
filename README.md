@@ -151,6 +151,7 @@ The container runs database migrations at startup. SQLite lives in the `constell
 | `SESSION_SECRET` | Signs session cookies; set a long random value | insecure placeholder |
 | `SECURE_COOKIES` | Sends session cookie only over HTTPS | `true` |
 | `MAX_UPLOAD_MB` | Maximum accepted CSV size | `10` |
+| `MAX_MINUTES_UPLOAD_MB` | Maximum reviewed-minutes document size | `16` |
 | `OBSIDIAN_VAULT` | Default vault for URI construction | empty |
 | `PUBLIC_URL` | Canonical contact-link URL and allowed MCP host | `http://localhost:8000` |
 | `MCP_API_TOKEN` | Enables and protects the read-only MCP service | empty/disabled |
@@ -210,6 +211,26 @@ Automatic matching is deterministic and ordered:
 Name-only similarity creates a manual merge candidate. It never merges automatically. Original source rows are retained as JSON for troubleshooting; uploaded CSV files themselves are not retained.
 
 Source data may add or refresh imported contact details. Re-import does not overwrite private CRM fields such as priority, relationship status, cadence, notes, tags, or Obsidian URI.
+
+## VetBiz reviewed-minutes workflow
+
+Open **VetBiz minutes** to upload or paste finalized, human-reviewed meeting notes. Version 1 accepts Markdown, plain text, and text-based RTF. It does not accept raw transcripts, recordings, OCR, DOCX, or PDF.
+
+The workflow is deliberately staged:
+
+1. Confirm that the source completed human review.
+2. Parse the source locally into an import record and review candidates.
+3. Review extracted contacts, organizations, meeting interactions, sourced offers/asks, follow-ups, possible Remulous Labs product fits, and possible introductions.
+4. Edit, match, approve, or reject each candidate.
+5. Commit only approved candidates in one database transaction.
+
+Parsing never creates or updates durable contacts, opportunities, signals, follow-ups, or connection suggestions. Exact-email meeting interactions have a dedicated low-risk bulk-approval action; fuzzy contact matches, opportunities, and introductions never support bulk approval.
+
+Each committed result retains its import record, source excerpt, review decision, and committed entity identifier. Duplicate files are detected by checksum. A changed file with the same meeting title and date is marked as a possible revision, and matching sourced interactions or signals are reused when possible.
+
+RTF extraction treats formatting and embedded content as untrusted. Pictures and unsupported formatting are ignored, while malformed, protected, object-bearing, deeply nested, oversized, or otherwise suspicious files are rejected. Older minutes with image-only contact lists can preserve their readable text but cannot yield contact rows without OCR.
+
+Undoing a committed reviewed-minutes import is deferred. Constellation can atomically prevent a partial commit, but safely reversing later contact-field additions or follow-up-date changes requires field-level ownership history so an undo cannot erase subsequent manual edits. Until that history exists, restore a database backup for full rollback and use the import audit page to review exactly what was committed.
 
 ## Merge review
 
@@ -310,6 +331,7 @@ Alembic applies schema upgrades during startup.
 - The container runs as an unprivileged user, drops Linux capabilities, uses `no-new-privileges`, and has a read-only root filesystem.
 - HTML templates escape values by default. Mutating forms use session-bound CSRF tokens.
 - CSV uploads are size- and extension-limited. They are parsed in memory and not persisted.
+- Reviewed-minutes uploads are size- and type-limited, rendered with template escaping, and parsed locally without executing RTF objects or fetching external references.
 - Dependency versions are pinned in `pyproject.toml`.
 
 ## Known limitations
@@ -319,6 +341,8 @@ Alembic applies schema upgrades during startup.
 - Imported professional changes are added to employment history; the UI does not yet provide a full employment editor.
 - Application settings are environment-based rather than editable in the browser.
 - No live Google synchronization or outbound communication exists.
+- Reviewed-minutes DOCX/PDF extraction and OCR are intentionally deferred; image-only contact lists remain source text without structured candidates.
+- Reviewed-minutes commits are atomic, but one-click post-commit rollback is deferred until imported field ownership can be reversed without overwriting later manual edits.
 
 ## Future Google People API synchronization
 

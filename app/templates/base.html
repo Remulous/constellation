@@ -42,6 +42,9 @@
       <a class="nav-item {{ 'active' if request.url.path.startswith('/imports') }}" href="/imports" {{ 'aria-current="page"' if request.url.path.startswith('/imports') }}>
         <svg class="icon"><use href="/static/icons.svg#upload"></use></svg><span>Imports</span>
       </a>
+      <a class="nav-item {{ 'active' if request.url.path.startswith('/vetbiz-imports') }}" href="/vetbiz-imports" {{ 'aria-current="page"' if request.url.path.startswith('/vetbiz-imports') }}>
+        <svg class="icon"><use href="/static/icons.svg#upload"></use></svg><span>VetBiz minutes</span>
+      </a>
       <a class="nav-item {{ 'active' if request.url.path.startswith('/merge-review') }}" href="/merge-review" {{ 'aria-current="page"' if request.url.path.startswith('/merge-review') }}>
         <svg class="icon"><use href="/static/icons.svg#merge"></use></svg><span>Merge review</span>
       </a>

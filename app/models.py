@@ -139,6 +139,13 @@ class Interaction(Base):
     summary: Mapped[str | None] = mapped_column(Text)
     source: Mapped[str] = mapped_column(String(50), default="manual")
     external_reference: Mapped[str | None] = mapped_column(Text)
+    source_import_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vetbiz_import_records.id"), index=True
+    )
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vetbiz_import_candidates.id"), unique=True
+    )
+    source_excerpt: Mapped[str | None] = mapped_column(Text)
     meaningful: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -201,4 +208,172 @@ class SavedSegment(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     filters: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class VetBizImportRecord(Base):
+    __tablename__ = "vetbiz_import_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    meeting_title: Mapped[str] = mapped_column(String(300))
+    meeting_date: Mapped[date] = mapped_column(Date, index=True)
+    source_type: Mapped[str] = mapped_column(
+        String(50), default="vetbiz_reviewed_minutes", index=True
+    )
+    review_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
+    review_notes: Mapped[str | None] = mapped_column(Text)
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    import_status: Mapped[str] = mapped_column(
+        String(30), default="pending_review", index=True
+    )
+    raw_text: Mapped[str] = mapped_column(Text)
+    checksum: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    revision_of_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vetbiz_import_records.id"), index=True
+    )
+    committed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    candidates: Mapped[list["VetBizImportCandidate"]] = relationship(
+        cascade="all, delete-orphan", back_populates="import_record"
+    )
+
+
+class VetBizImportCandidate(Base):
+    __tablename__ = "vetbiz_import_candidates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    import_record_id: Mapped[int] = mapped_column(
+        ForeignKey("vetbiz_import_records.id", ondelete="CASCADE"), index=True
+    )
+    candidate_type: Mapped[str] = mapped_column(String(40), index=True)
+    extracted_data: Mapped[dict] = mapped_column(JSON, default=dict)
+    source_excerpt: Mapped[str] = mapped_column(Text)
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    matched_entity_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    match_reason: Mapped[str | None] = mapped_column(Text)
+    resolution_notes: Mapped[str | None] = mapped_column(Text)
+    committed_entity_type: Mapped[str | None] = mapped_column(String(40))
+    committed_entity_id: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    import_record: Mapped["VetBizImportRecord"] = relationship(back_populates="candidates")
+
+
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(250), index=True)
+    normalized_name: Mapped[str] = mapped_column(String(250), unique=True, index=True)
+    website: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    source_import_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vetbiz_import_records.id"), index=True
+    )
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vetbiz_import_candidates.id"), unique=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class RelationshipSignal(Base):
+    __tablename__ = "relationship_signals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    person_id: Mapped[str | None] = mapped_column(
+        ForeignKey("people.id", ondelete="CASCADE"), index=True
+    )
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
+    signal_type: Mapped[str] = mapped_column(String(50), index=True)
+    summary: Mapped[str] = mapped_column(Text)
+    meeting_date: Mapped[date] = mapped_column(Date, index=True)
+    source_import_id: Mapped[int] = mapped_column(
+        ForeignKey("vetbiz_import_records.id"), index=True
+    )
+    source_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("vetbiz_import_candidates.id"), unique=True
+    )
+    source_excerpt: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Opportunity(Base):
+    __tablename__ = "opportunities"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(300))
+    person_id: Mapped[str | None] = mapped_column(
+        ForeignKey("people.id", ondelete="SET NULL"), index=True
+    )
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
+    product: Mapped[str | None] = mapped_column(String(80), index=True)
+    stage: Mapped[str] = mapped_column(String(50), default="identified", index=True)
+    next_action: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    source_signal_id: Mapped[int | None] = mapped_column(
+        ForeignKey("relationship_signals.id"), index=True
+    )
+    source_import_id: Mapped[int] = mapped_column(
+        ForeignKey("vetbiz_import_records.id"), index=True
+    )
+    source_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("vetbiz_import_candidates.id"), unique=True
+    )
+    source_excerpt: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class ConnectionSuggestion(Base):
+    __tablename__ = "connection_suggestions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_person_id: Mapped[str] = mapped_column(
+        ForeignKey("people.id", ondelete="CASCADE"), index=True
+    )
+    target_person_id: Mapped[str] = mapped_column(
+        ForeignKey("people.id", ondelete="CASCADE"), index=True
+    )
+    reason: Mapped[str] = mapped_column(Text)
+    supporting_signal_ids: Mapped[list] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(30), default="suggested", index=True)
+    source_import_id: Mapped[int] = mapped_column(
+        ForeignKey("vetbiz_import_records.id"), index=True
+    )
+    source_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("vetbiz_import_candidates.id"), unique=True
+    )
+    source_excerpt: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class FollowUpSuggestion(Base):
+    __tablename__ = "follow_up_suggestions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    person_id: Mapped[str] = mapped_column(
+        ForeignKey("people.id", ondelete="CASCADE"), index=True
+    )
+    summary: Mapped[str] = mapped_column(Text)
+    due_date: Mapped[date | None] = mapped_column(Date, index=True)
+    status: Mapped[str] = mapped_column(String(30), default="suggested", index=True)
+    source_import_id: Mapped[int] = mapped_column(
+        ForeignKey("vetbiz_import_records.id"), index=True
+    )
+    source_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("vetbiz_import_candidates.id"), unique=True
+    )
+    source_excerpt: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

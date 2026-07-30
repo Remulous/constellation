@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Review {{ record.meeting_title }} · Constellation{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow"><svg class="icon"><use href="/static/icons.svg#shield"></use></svg>Human approval required</p>
+    <h1>{{ record.meeting_title }}</h1>
+    <p class="page-description">{{ record.meeting_date.strftime("%B %-d, %Y") }} · {{ record.filename }} · Import #{{ record.id }}</p>
+  </div>
+  <div class="actions"><a class="button secondary" href="/vetbiz-imports">All imports</a></div>
+</div>
+
+{% if error %}<div class="flash" role="alert">{{ error }}</div>{% endif %}
+{% if notice %}<div class="notice vetbiz-notice"><svg class="icon"><use href="/static/icons.svg#shield"></use></svg><span>{{ notice }}</span></div>{% endif %}
+{% if prior %}
+<div class="notice vetbiz-warning">
+  <svg class="icon"><use href="/static/icons.svg#merge"></use></svg>
+  <span>This appears to revise <a href="/vetbiz-imports/{{ prior.id }}">import #{{ prior.id }}</a> from the same meeting. Existing sourced interactions and signals will be reused rather than duplicated when possible.</span>
+</div>
+{% endif %}
+
+<section class="vetbiz-summary">
+  <div class="summary-tile panel"><strong>{{ counts.pending }}</strong><span>Pending</span></div>
+  <div class="summary-tile panel"><strong>{{ counts.edited }}</strong><span>Edited</span></div>
+  <div class="summary-tile panel"><strong>{{ counts.approved }}</strong><span>Approved</span></div>
+  <div class="summary-tile panel"><strong>{{ counts.rejected }}</strong><span>Rejected</span></div>
+  <div class="summary-tile panel"><strong>{{ counts.committed }}</strong><span>Committed</span></div>
+</section>
+
+<section class="panel vetbiz-provenance">
+  <div class="panel-header"><div><h2>Import provenance</h2><p>The extracted source remains local and every committed record points back to this import and its source excerpt.</p></div></div>
+  {% if record.import_status != "committed" %}
+  <form method="post" action="/vetbiz-imports/{{ record.id }}/metadata" class="vetbiz-metadata-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="two">
+      <div><label for="meeting_title">Meeting title</label><input id="meeting_title" name="meeting_title" value="{{ record.meeting_title }}" required></div>
+      <div><label for="meeting_date">Meeting date</label><input id="meeting_date" name="meeting_date" type="date" value="{{ record.meeting_date.isoformat() }}" required></div>
+    </div>
+    <label for="review_notes">Review notes</label>
+    <input id="review_notes" name="review_notes" value="{{ record.review_notes or '' }}">
+    <div class="actions"><button class="secondary small" type="submit">Save import metadata</button></div>
+  </form>
+  {% endif %}
+  <dl class="vetbiz-facts">
+    <div><dt>Source type</dt><dd>{{ record.source_type }}</dd></div>
+    <div><dt>Human review</dt><dd>{{ "Confirmed" if record.review_confirmed else "Not confirmed" }}</dd></div>
+    <div><dt>Status</dt><dd>{{ record.import_status|replace("_", " ")|title }}</dd></div>
+    <div><dt>Checksum</dt><dd><code>{{ record.checksum[:16] }}…</code></dd></div>
+    {% if record.review_notes %}<div class="wide"><dt>Review notes</dt><dd>{{ record.review_notes }}</dd></div>{% endif %}
+  </dl>
+  <details class="details-panel vetbiz-source">
+    <summary>View safely extracted source text</summary>
+    <div class="details-body"><pre>{{ record.raw_text }}</pre></div>
+  </details>
+</section>
+
+{% if record.import_status != "committed" %}
+<div class="vetbiz-review-actions">
+  <form method="post" action="/vetbiz-imports/{{ record.id }}/approve-safe">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="secondary" type="submit">Approve safe exact-email interactions</button>
+  </form>
+  <form method="post" action="/vetbiz-imports/{{ record.id }}/commit">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" {% if counts.approved == 0 %}disabled{% endif %}>Commit {{ counts.approved }} approved change{{ "" if counts.approved == 1 else "s" }}</button>
+  </form>
+</div>
+{% if contact_candidates|length > 1 %}
+<details class="panel details-panel vetbiz-manual-connection">
+  <summary>Create an introduction proposal from reviewed participants</summary>
+  <div class="details-body">
+    <form method="post" action="/vetbiz-imports/{{ record.id }}/connection-suggestions">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="two">
+        <div>
+          <label for="source_candidate_id">Person with the ask or need</label>
+          <select id="source_candidate_id" name="source_candidate_id" required>
+            {% for contact in contact_candidates %}<option value="{{ contact.id }}">{{ contact.extracted_data.get("display_name") }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="target_candidate_id">Person with the relevant offer</label>
+          <select id="target_candidate_id" name="target_candidate_id" required>
+            {% for contact in contact_candidates %}<option value="{{ contact.id }}">{{ contact.extracted_data.get("display_name") }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <label for="connection_reason">Why might this introduction help?</label>
+      <textarea id="connection_reason" name="reason" required></textarea>
+      <div class="actions"><button type="submit">Create review proposal</button></div>
+    </form>
+  </div>
+</details>
+{% endif %}
+{% endif %}
+
+{% for group_key, group_label, candidates in grouped %}
+<section class="vetbiz-candidate-group" id="{{ group_key }}">
+  <div class="section-header">
+    <div><p class="kicker">{{ candidates|length }} proposal{{ "" if candidates|length == 1 else "s" }}</p><h2>{{ group_label }}</h2></div>
+  </div>
+  <div class="vetbiz-candidate-list">
+  {% for candidate in candidates %}
+    <article class="panel vetbiz-candidate status-{{ candidate.status }}">
+      <div class="vetbiz-candidate-header">
+        <div>
+          <span class="status-pill status-{{ 'active' if candidate.status == 'committed' else ('prospect' if candidate.status in ['approved', 'edited'] else 'dormant') }}">{{ candidate.status|title }}</span>
+          <strong>{{ candidate.candidate_type|replace("_", " ")|title }}</strong>
+        </div>
+        <span class="badge">{{ (candidate.confidence * 100)|round|int }}% confidence</span>
+      </div>
+
+      <div class="vetbiz-review-grid">
+        <div>
+          <p class="kicker">Extracted source</p>
+          <blockquote>{{ candidate.source_excerpt }}</blockquote>
+        </div>
+        <div>
+          <p class="kicker">Matching rationale</p>
+          <p>{{ candidate.match_reason or "No deterministic match" }}</p>
+          {% if candidate.matched_entity_id and matched_people.get(candidate.matched_entity_id) %}
+            {% set matched = matched_people.get(candidate.matched_entity_id) %}
+            <p><a href="/people/{{ matched.id }}">{{ matched.display_name }}</a>{% if matched.current_organization %} · {{ matched.current_organization }}{% endif %}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if record.import_status == "committed" %}
+        <div class="vetbiz-committed-result">
+          <strong>Committed result</strong>
+          <span>{{ candidate.committed_entity_type|replace("_", " ")|title }}{% if candidate.committed_entity_id %} #{{ candidate.committed_entity_id }}{% endif %}</span>
+          {% if candidate.resolution_notes %}<p>{{ candidate.resolution_notes }}</p>{% endif %}
+        </div>
+      {% else %}
+      <form method="post" action="/vetbiz-imports/{{ record.id }}/candidates/{{ candidate.id }}" class="vetbiz-candidate-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% if candidate.candidate_type in ["new_contact", "contact_update"] %}
+          <label for="match-{{ candidate.id }}">Contact match</label>
+          <select id="match-{{ candidate.id }}" name="matched_entity_id">
+            <option value="">Create as a new contact</option>
+            {% if candidate.matched_entity_id and matched_people.get(candidate.matched_entity_id) %}
+              {% set selected_person = matched_people.get(candidate.matched_entity_id) %}
+              <option value="{{ selected_person.id }}" selected>{{ selected_person.display_name }}{% if selected_person.current_organization %} — {{ selected_person.current_organization }}{% endif %}</option>
+            {% endif %}
+            {% for option in candidate.extracted_data.get("match_options", []) %}
+              {% if option.id != candidate.matched_entity_id %}
+              <option value="{{ option.id }}">{{ option.display_name }}{% if option.organization %} — {{ option.organization }}{% endif %} ({{ option.reason }})</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        {% else %}
+          <input type="hidden" name="matched_entity_id" value="{{ candidate.matched_entity_id or '' }}">
+        {% endif %}
+
+        <div class="vetbiz-fields">
+        {% for field in editable_fields.get(candidate.candidate_type, [])|sort %}
+          {% set value = candidate.extracted_data.get(field, "") %}
+          <div class="{{ 'wide' if field in ['summary', 'notes', 'next_action', 'reason'] else '' }}">
+            <label for="{{ field }}-{{ candidate.id }}">{{ field|replace("_", " ")|title }}</label>
+            {% if field in ["summary", "notes", "next_action", "reason"] %}
+              <textarea id="{{ field }}-{{ candidate.id }}" name="{{ field }}">{{ value }}</textarea>
+            {% else %}
+              <input id="{{ field }}-{{ candidate.id }}" name="{{ field }}" value="{{ value }}">
+            {% endif %}
+          </div>
+        {% endfor %}
+        </div>
+        <label for="resolution-{{ candidate.id }}">Resolution notes</label>
+        <input id="resolution-{{ candidate.id }}" name="resolution_notes" value="{{ candidate.resolution_notes or '' }}" placeholder="Optional audit note">
+        <div class="actions">
+          <button class="secondary small" type="submit" name="action" value="save">Save edit</button>
+          <button class="small" type="submit" name="action" value="approve">Approve</button>
+          <button class="danger small" type="submit" name="action" value="reject">Reject</button>
+        </div>
+      </form>
+      {% if candidate.candidate_type == "signal" %}
+      <form method="post" action="/vetbiz-imports/{{ record.id }}/candidates/{{ candidate.id }}/opportunity" class="inline vetbiz-convert-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="quiet small" type="submit">Convert to opportunity proposal</button>
+      </form>
+      {% endif %}
+      {% endif %}
+    </article>
+  {% endfor %}
+  </div>
+</section>
+{% else %}
+<section class="panel empty-state">
+  <div><span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#shield"></use></svg></span><h3>No structured participant rows found</h3><p>The source was preserved, but no supported participant table or labeled blocks were detected. Image-only contact lists require OCR and remain intentionally unsupported.</p></div>
+</section>
+{% endfor %}
+{% endblock %}
