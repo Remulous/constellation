@@ -191,6 +191,8 @@ def test_two_selected_people_can_be_reviewed_and_merged(db):
                     "csrf_token": token,
                     "bulk_action": "merge",
                     "person_ids": [canonical.id, duplicate.id],
+                    "tag_id": "",
+                    "cadence": "",
                 },
             )
             assert review.status_code == 200
