@@ -98,6 +98,19 @@
 <section class="vetbiz-candidate-group" id="{{ group_key }}">
   <div class="section-header">
     <div><p class="kicker">{{ candidates|length }} proposal{{ "" if candidates|length == 1 else "s" }}</p><h2>{{ group_label }}</h2></div>
+    {% set pending_count = candidates|selectattr("status", "equalto", "pending")|list|length %}
+    {% set edited_count = candidates|selectattr("status", "equalto", "edited")|list|length %}
+    {% set unresolved_count = pending_count + edited_count %}
+    {% if record.import_status != "committed" and unresolved_count %}
+    <div class="vetbiz-group-actions">
+      <span>{{ unresolved_count }} unresolved</span>
+      <form method="post" action="/vetbiz-imports/{{ record.id }}/groups/{{ group_key }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="secondary small" type="submit" name="action" value="approve">Approve all</button>
+        <button class="quiet small" type="submit" name="action" value="reject">Reject all</button>
+      </form>
+    </div>
+    {% endif %}
   </div>
   <div class="vetbiz-candidate-list">
   {% for candidate in candidates %}

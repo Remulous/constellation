@@ -44,6 +44,7 @@ from app.services.vetbiz_imports import (
     EDITABLE_FIELDS,
     VetBizImportError,
     approve_safe_interactions,
+    bulk_decide_candidates,
     commit_reviewed_import,
     create_reviewed_import,
     propose_connection_suggestion,
@@ -507,6 +508,10 @@ VETBIZ_GROUPS = (
     ("opportunities", "Possible Remulous Labs opportunities", {"opportunity"}),
     ("connections", "Possible introductions", {"connection_suggestion"}),
 )
+VETBIZ_GROUP_TYPES = {
+    key: candidate_types for key, _label, candidate_types in VETBIZ_GROUPS
+}
+VETBIZ_GROUP_LABELS = {key: label for key, label, _types in VETBIZ_GROUPS}
 
 
 def _vetbiz_import_context(
@@ -642,6 +647,16 @@ def vetbiz_import_review(
         notice = "Candidate decision saved."
     elif request.query_params.get("bulk"):
         notice = "Safe exact-email meeting interactions were approved."
+    elif group_key := request.query_params.get("bulk_group"):
+        action = request.query_params.get("bulk_action", "updated")
+        count = request.query_params.get("bulk_count", "0")
+        group_label = VETBIZ_GROUP_LABELS.get(group_key, "Candidate")
+        past_action = {"approve": "approved", "reject": "rejected"}.get(
+            action, "updated"
+        )
+        notice = (
+            f"{count} unresolved {group_label.lower()} proposal(s) {past_action}."
+        )
     elif request.query_params.get("committed"):
         notice = "Approved changes were committed atomically."
     return templates.TemplateResponse(
@@ -706,6 +721,38 @@ def bulk_approve_vetbiz_interactions(
     approve_safe_interactions(record)
     db.commit()
     return RedirectResponse(f"/vetbiz-imports/{import_id}?bulk=1", status_code=303)
+
+
+@app.post("/vetbiz-imports/{import_id}/groups/{group_key}")
+def bulk_decide_vetbiz_group(
+    request: Request,
+    import_id: int,
+    group_key: str,
+    action: str = Form(...),
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    record = db.get(VetBizImportRecord, import_id)
+    candidate_types = VETBIZ_GROUP_TYPES.get(group_key)
+    if not record:
+        raise HTTPException(404, "Reviewed-minutes import not found")
+    if not candidate_types:
+        raise HTTPException(404, "Reviewed-minutes candidate group not found")
+    try:
+        count = bulk_decide_candidates(record, candidate_types, action)
+        db.commit()
+    except VetBizImportError as exc:
+        db.rollback()
+        return templates.TemplateResponse(
+            "vetbiz_import_review.html",
+            _vetbiz_import_context(request, db, record, error=str(exc)),
+            status_code=400,
+        )
+    return RedirectResponse(
+        f"/vetbiz-imports/{import_id}?bulk_group={group_key}"
+        f"&bulk_action={action}&bulk_count={count}#{group_key}",
+        status_code=303,
+    )
 
 
 @app.post("/vetbiz-imports/{import_id}/candidates/{candidate_id}/opportunity")

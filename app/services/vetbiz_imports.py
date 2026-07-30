@@ -1177,6 +1177,31 @@ def approve_safe_interactions(record: VetBizImportRecord) -> int:
     return approved
 
 
+def bulk_decide_candidates(
+    record: VetBizImportRecord,
+    candidate_types: set[str],
+    action: str,
+) -> int:
+    if record.import_status == "committed":
+        raise VetBizImportError("Committed imports cannot be edited.")
+    if action not in {"approve", "reject"}:
+        raise VetBizImportError("Unsupported bulk candidate action.")
+
+    decided = 0
+    resolved_at = datetime.now(timezone.utc)
+    for candidate in record.candidates:
+        if (
+            candidate.candidate_type in candidate_types
+            and candidate.status in {"pending", "edited"}
+        ):
+            candidate.status = "approved" if action == "approve" else "rejected"
+            if not candidate.resolution_notes:
+                candidate.resolution_notes = f"Bulk {action}d during import review."
+            candidate.resolved_at = resolved_at
+            decided += 1
+    return decided
+
+
 def propose_opportunity_from_signal(
     record: VetBizImportRecord, signal_candidate: VetBizImportCandidate
 ) -> VetBizImportCandidate:
