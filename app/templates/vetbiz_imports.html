@@ -10,6 +10,7 @@
 </div>
 
 {% if error %}<div class="flash" role="alert">{{ error }}</div>{% endif %}
+{% if notice %}<div class="notice vetbiz-notice"><svg class="icon"><use href="/static/icons.svg#shield"></use></svg><span>{{ notice }}</span></div>{% endif %}
 
 <section class="panel">
   <div class="panel-header">
@@ -55,7 +56,17 @@
           <td class="date-cell" data-label="Imported"><strong>{{ record.imported_at.strftime("%b %-d, %Y") }}</strong><span>{{ record.imported_at.strftime("%-I:%M %p") }}</span></td>
           <td data-label="Status"><span class="status-pill status-{{ 'active' if record.import_status == 'committed' else 'prospect' }}">{{ record.import_status|replace("_", " ")|title }}</span></td>
           <td data-label="Revision">{{ "Import #" ~ record.revision_of_id if record.revision_of_id else "—" }}</td>
-          <td data-label="Review"><a class="button secondary small" href="/vetbiz-imports/{{ record.id }}">Open</a></td>
+          <td data-label="Review">
+            <div class="table-actions">
+              <a class="button secondary small" href="/vetbiz-imports/{{ record.id }}">Open</a>
+              {% if record.import_status != "committed" %}
+              <form method="post" action="/vetbiz-imports/{{ record.id }}/delete" data-confirm="Delete this in-progress review and all of its staged proposals? This cannot be undone.">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="danger small" type="submit">Delete</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
         </tr>
       {% else %}
         <tr><td class="primary-cell" colspan="6"><div class="empty-state compact"><div><span class="empty-mark"><svg class="icon icon-lg"><use href="/static/icons.svg#upload"></use></svg></span><h3>No reviewed minutes imported</h3><p>Upload a finalized VetBiz document to create a review queue.</p></div></div></td></tr>

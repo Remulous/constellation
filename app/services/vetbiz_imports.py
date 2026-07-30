@@ -1202,6 +1202,24 @@ def bulk_decide_candidates(
     return decided
 
 
+def delete_pending_import(db: Session, record: VetBizImportRecord) -> int:
+    if record.import_status == "committed":
+        raise VetBizImportError(
+            "Committed imports cannot be deleted because they are part of the CRM audit trail."
+        )
+
+    candidates_deleted = len(record.candidates)
+    revisions = db.scalars(
+        select(VetBizImportRecord).where(
+            VetBizImportRecord.revision_of_id == record.id
+        )
+    ).all()
+    for revision in revisions:
+        revision.revision_of_id = record.revision_of_id
+    db.delete(record)
+    return candidates_deleted
+
+
 def propose_opportunity_from_signal(
     record: VetBizImportRecord, signal_candidate: VetBizImportCandidate
 ) -> VetBizImportCandidate:

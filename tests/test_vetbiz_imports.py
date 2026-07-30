@@ -23,6 +23,7 @@ from app.services.vetbiz_imports import (
     bulk_decide_candidates,
     commit_reviewed_import,
     create_reviewed_import,
+    delete_pending_import,
     extract_rtf_text,
     parse_reviewed_minutes,
     propose_connection_suggestion,
@@ -408,6 +409,21 @@ def test_bulk_decision_updates_only_unresolved_candidates(db):
     assert all(item.resolved_at is not None for item in signals)
 
 
+def test_committed_review_cannot_be_deleted(db):
+    record = create_reviewed_import(
+        db,
+        "minutes.md",
+        fixture("vetbiz_reviewed_minutes.md"),
+        review_confirmed=True,
+    ).record
+    record.import_status = "committed"
+
+    with pytest.raises(VetBizImportError, match="audit trail"):
+        delete_pending_import(db, record)
+
+    assert db.get(VetBizImportRecord, record.id) is record
+
+
 def test_http_review_workflow_requires_confirmation_and_escapes_source(db):
     app.dependency_overrides[get_db] = lambda: db
     malicious = b"""# Fictional VetBiz Reviewed Minutes
@@ -477,5 +493,19 @@ July 29, 2026
             )
             assert decision.status_code == 303
             assert decision.headers["location"].endswith(f"?saved=1#{anchor}")
+
+            deleted = client.post(
+                f"/vetbiz-imports/{record.id}/delete",
+                data={"csrf_token": token},
+                follow_redirects=False,
+            )
+            assert deleted.status_code == 303
+            assert deleted.headers["location"] == "/vetbiz-imports?deleted=1"
+            assert db.get(VetBizImportRecord, record.id) is None
+            assert (
+                db.scalar(select(func.count()).select_from(VetBizImportCandidate))
+                == 0
+            )
+            assert db.scalar(select(func.count()).select_from(Person)) == 0
     finally:
         app.dependency_overrides.clear()

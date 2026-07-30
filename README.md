@@ -224,7 +224,9 @@ The workflow is deliberately staged:
 4. Edit, match, approve, or reject each candidate.
 5. Commit only approved candidates in one database transaction.
 
-Parsing never creates or updates durable contacts, opportunities, signals, follow-ups, or connection suggestions. Exact-email meeting interactions have a dedicated low-risk bulk-approval action; fuzzy contact matches, opportunities, and introductions never support bulk approval.
+Parsing never creates or updates durable contacts, opportunities, signals, follow-ups, or connection suggestions. Exact-email meeting interactions have a dedicated low-risk bulk-approval action, and each review section supports explicit bulk approval or rejection of unresolved proposals. Bulk approval never sends outreach or introductions automatically.
+
+An in-progress review can be deleted together with all of its staged proposals. Committed imports cannot be deleted because their source record is part of the provenance and audit trail.
 
 Each committed result retains its import record, source excerpt, review decision, and committed entity identifier. Duplicate files are detected by checksum. A changed file with the same meeting title and date is marked as a possible revision, and matching sourced interactions or signals are reused when possible.
 
