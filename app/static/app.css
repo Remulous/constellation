@@ -662,6 +662,9 @@ tbody tr:last-child td { border-bottom: 0; }
 .vetbiz-review-actions { position: sticky; z-index: 8; top: .75rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: 1rem 0; padding: .75rem; border: 1px solid var(--line-strong); border-radius: var(--radius); background: rgb(255 255 255 / .95); box-shadow: var(--shadow-md); backdrop-filter: blur(12px); }
 .vetbiz-review-actions form { margin: 0; }
 .vetbiz-candidate-group { margin-top: 1.4rem; }
+.vetbiz-group-actions { display: flex; align-items: center; gap: .65rem; }
+.vetbiz-group-actions > span { color: var(--muted); font-size: .78rem; font-weight: 700; }
+.vetbiz-group-actions form { display: flex; gap: .4rem; margin: 0; }
 .vetbiz-candidate-list { display: grid; gap: .8rem; }
 .vetbiz-candidate { scroll-margin-top: 1rem; }
 .vetbiz-candidate { border-left: 4px solid var(--line-strong); }

@@ -20,6 +20,7 @@ from app.models import (
 )
 from app.services.vetbiz_imports import (
     VetBizImportError,
+    bulk_decide_candidates,
     commit_reviewed_import,
     create_reviewed_import,
     extract_rtf_text,
@@ -386,6 +387,27 @@ def test_user_can_create_opportunity_and_connection_proposals(db):
     assert db.scalar(select(func.count()).select_from(ConnectionSuggestion)) == 0
 
 
+def test_bulk_decision_updates_only_unresolved_candidates(db):
+    record = create_reviewed_import(
+        db,
+        "minutes.md",
+        fixture("vetbiz_reviewed_minutes.md"),
+        review_confirmed=True,
+    ).record
+    signals = [
+        item for item in record.candidates if item.candidate_type == "signal"
+    ]
+    update_candidate(signals[0], "reject", {})
+    update_candidate(signals[1], "save", {"summary": "Reviewed wording"})
+
+    decided = bulk_decide_candidates(record, {"signal"}, "approve")
+
+    assert decided == len(signals) - 1
+    assert signals[0].status == "rejected"
+    assert all(item.status == "approved" for item in signals[1:])
+    assert all(item.resolved_at is not None for item in signals)
+
+
 def test_http_review_workflow_requires_confirmation_and_escapes_source(db):
     app.dependency_overrides[get_db] = lambda: db
     malicious = b"""# Fictional VetBiz Reviewed Minutes
@@ -436,6 +458,17 @@ July 29, 2026
             )
             anchor = f"candidate-{review_candidate.id}"
             assert f'id="{anchor}"' in review.text
+            assert f"/vetbiz-imports/{record.id}/groups/contacts" in review.text
+
+            bulk = client.post(
+                f"/vetbiz-imports/{record.id}/groups/contacts",
+                data={"csrf_token": token, "action": "approve"},
+                follow_redirects=False,
+            )
+            assert bulk.status_code == 303
+            assert bulk.headers["location"].endswith(
+                "?bulk_group=contacts&bulk_action=approve&bulk_count=1#contacts"
+            )
 
             decision = client.post(
                 f"/vetbiz-imports/{record.id}/candidates/{review_candidate.id}",
