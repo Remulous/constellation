@@ -603,7 +603,10 @@ def _extract_contact_fields(row: dict[str, str]) -> dict[str, str]:
 def _split_name_affiliation(value: str) -> tuple[str, str]:
     value = _clean_text(value, 300)
     match = re.match(
-        r"^(.*?)(?:,\s*)?((?:USNA|USMA|USMMA|USAFA|USCGA)\s*)?[’'](\d{2})$",
+        r"^(.*?)(?:,\s*)?(?:\(\s*)?"
+        r"((?:USNA|USMA|USMMA|USAFA|USCGA)\s*)?"
+        r"(?:[‘’'`](\d{2})|(?:class\s+of\s+)?((?:19|20)\d{2}))"
+        r"(?:\s*\))?$",
         value,
         flags=re.IGNORECASE,
     )
@@ -611,7 +614,8 @@ def _split_name_affiliation(value: str) -> tuple[str, str]:
         return value, ""
     name = match.group(1).rstrip(" ,")
     academy = (match.group(2) or "").strip().upper()
-    affiliation = f"{academy} '{match.group(3)}".strip()
+    class_year = f"'{match.group(3)}" if match.group(3) else match.group(4)
+    affiliation = f"{academy} {class_year}".strip()
     return name, affiliation
 
 

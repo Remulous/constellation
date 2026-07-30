@@ -53,6 +53,9 @@ def test_markdown_plain_text_and_missing_fields_parse():
     assert markdown.meeting_date.isoformat() == "2026-07-29"
     assert markdown.meeting_title == "Fictional Service Academy VetBiz Reviewed Minutes"
     assert len(markdown.participants) == 4
+    assert markdown.participants[0].display_name == "Alex Carter"
+    assert markdown.participants[0].last_name == "Carter"
+    assert markdown.participants[0].affiliation == "'08"
     assert markdown.participants[0].email == "alex.carter@example.test"
     assert "WARN" in markdown.participants[0].ask
 
@@ -62,6 +65,36 @@ def test_markdown_plain_text_and_missing_fields_parse():
     assert len(plain.participants) == 2
     assert plain.participants[1].organization == ""
     assert plain.participants[1].email == ""
+
+
+@pytest.mark.parametrize(
+    ("reviewed_name", "expected_affiliation"),
+    [
+        ("Avery Stone ‘09", "'09"),
+        ("Avery Stone ’09", "'09"),
+        ("Avery Stone '09", "'09"),
+        ("Avery Stone, USNA ‘09", "USNA '09"),
+        ("Avery Stone (USMA '09)", "USMA '09"),
+        ("Avery Stone Class of 2009", "2009"),
+    ],
+)
+def test_class_year_is_affiliation_not_last_name(
+    reviewed_name, expected_affiliation
+):
+    parsed = parse_reviewed_minutes(
+        "minutes.txt",
+        (
+            "Fictional VetBiz Reviewed Minutes\n"
+            "July 29, 2026\n\n"
+            f"Name: {reviewed_name}\n"
+            "Organization: Stone Works\n"
+        ).encode(),
+    )
+    participant = parsed.participants[0]
+    assert participant.display_name == "Avery Stone"
+    assert participant.first_name == "Avery"
+    assert participant.last_name == "Stone"
+    assert participant.affiliation == expected_affiliation
 
 
 def test_rtf_parser_preserves_tables_and_ignores_unsupported_formatting():
