@@ -325,8 +325,8 @@ def people_rows(
 @app.post("/people/bulk")
 def bulk_people(
     request: Request, person_ids: list[str] = Form(default=[]),
-    bulk_action: str = Form(...), tag_id: int | None = Form(None),
-    cadence: int | None = Form(None), db: Session = Depends(get_db),
+    bulk_action: str = Form(...), tag_id: str = Form(""),
+    cadence: str = Form(""), db: Session = Depends(get_db),
     _csrf: None = Depends(require_csrf),
 ):
     unique_person_ids = list(dict.fromkeys(person_ids))
@@ -355,14 +355,22 @@ def bulk_people(
             ),
         )
     if bulk_action == "tag" and tag_id:
-        tag = db.get(Tag, tag_id)
+        try:
+            parsed_tag_id = int(tag_id)
+        except ValueError as exc:
+            raise HTTPException(400, "Choose a valid tag.") from exc
+        tag = db.get(Tag, parsed_tag_id)
         if tag:
             for person in people:
                 if tag not in person.tags:
                     person.tags.append(tag)
     elif bulk_action == "cadence":
+        try:
+            parsed_cadence = int(cadence) if cadence else None
+        except ValueError as exc:
+            raise HTTPException(400, "Choose a valid cadence.") from exc
         for person in people:
-            person.followup_interval_days = cadence
+            person.followup_interval_days = parsed_cadence
             refresh_followup(person)
     db.commit()
     return RedirectResponse("/people", status_code=303)

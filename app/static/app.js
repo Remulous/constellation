@@ -48,8 +48,14 @@ function updateSelection() {
   if (selectionCount) selectionCount.textContent = String(selectedPeople.size);
   if (selectionToolbar) selectionToolbar.classList.toggle("is-active", selectedPeople.size > 0);
   const merging = bulkAction?.value === "merge";
-  if (bulkTag) bulkTag.hidden = bulkAction?.value !== "tag";
-  if (bulkCadence) bulkCadence.hidden = bulkAction?.value !== "cadence";
+  if (bulkTag) {
+    bulkTag.hidden = bulkAction?.value !== "tag";
+    bulkTag.disabled = bulkAction?.value !== "tag";
+  }
+  if (bulkCadence) {
+    bulkCadence.hidden = bulkAction?.value !== "cadence";
+    bulkCadence.disabled = bulkAction?.value !== "cadence";
+  }
   if (selectionSubmit) {
     selectionSubmit.disabled = merging
       ? selectedPeople.size !== 2
