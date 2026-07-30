@@ -101,7 +101,7 @@
   </div>
   <div class="vetbiz-candidate-list">
   {% for candidate in candidates %}
-    <article class="panel vetbiz-candidate status-{{ candidate.status }}">
+    <article id="candidate-{{ candidate.id }}" class="panel vetbiz-candidate status-{{ candidate.status }}">
       <div class="vetbiz-candidate-header">
         <div>
           <span class="status-pill status-{{ 'active' if candidate.status == 'committed' else ('prospect' if candidate.status in ['approved', 'edited'] else 'dormant') }}">{{ candidate.status|title }}</span>

@@ -663,6 +663,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .vetbiz-review-actions form { margin: 0; }
 .vetbiz-candidate-group { margin-top: 1.4rem; }
 .vetbiz-candidate-list { display: grid; gap: .8rem; }
+.vetbiz-candidate { scroll-margin-top: 1rem; }
 .vetbiz-candidate { border-left: 4px solid var(--line-strong); }
 .vetbiz-candidate.status-approved { border-left-color: var(--primary); }
 .vetbiz-candidate.status-edited { border-left-color: var(--warning); }

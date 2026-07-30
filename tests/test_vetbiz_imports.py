@@ -394,5 +394,22 @@ July 29, 2026
             assert "<script>alert" not in review.text
             assert "Final review" in review.text
             assert "Commit 0 approved changes" in review.text
+
+            record = db.scalar(select(VetBizImportRecord))
+            review_candidate = db.scalar(
+                select(VetBizImportCandidate)
+                .where(VetBizImportCandidate.import_record_id == record.id)
+                .order_by(VetBizImportCandidate.id)
+            )
+            anchor = f"candidate-{review_candidate.id}"
+            assert f'id="{anchor}"' in review.text
+
+            decision = client.post(
+                f"/vetbiz-imports/{record.id}/candidates/{review_candidate.id}",
+                data={"csrf_token": token, "action": "reject"},
+                follow_redirects=False,
+            )
+            assert decision.status_code == 303
+            assert decision.headers["location"].endswith(f"?saved=1#{anchor}")
     finally:
         app.dependency_overrides.clear()
