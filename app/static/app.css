@@ -316,6 +316,8 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 .actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: .85rem 0; }
 .actions:last-child { margin-bottom: 0; }
 form.inline { display: inline; }
+.table-actions { display: flex; align-items: center; gap: .4rem; }
+.table-actions form { margin: 0; }
 
 label { display: block; margin: .75rem 0 .3rem; color: #334155; font-size: .79rem; font-weight: 680; }
 input:not([type="checkbox"]):not([type="radio"]), select, textarea {

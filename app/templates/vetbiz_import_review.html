@@ -7,7 +7,15 @@
     <h1>{{ record.meeting_title }}</h1>
     <p class="page-description">{{ record.meeting_date.strftime("%B %-d, %Y") }} · {{ record.filename }} · Import #{{ record.id }}</p>
   </div>
-  <div class="actions"><a class="button secondary" href="/vetbiz-imports">All imports</a></div>
+  <div class="actions">
+    <a class="button secondary" href="/vetbiz-imports">All imports</a>
+    {% if record.import_status != "committed" %}
+    <form method="post" action="/vetbiz-imports/{{ record.id }}/delete" data-confirm="Delete this in-progress review and all of its staged proposals? This cannot be undone.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="danger" type="submit">Delete review</button>
+    </form>
+    {% endif %}
+  </div>
 </div>
 
 {% if error %}<div class="flash" role="alert">{{ error }}</div>{% endif %}

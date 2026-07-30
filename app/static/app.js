@@ -19,6 +19,11 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") setSidebar(false);
 });
 
+document.addEventListener("submit", (event) => {
+  const message = event.target.dataset.confirm;
+  if (message && !window.confirm(message)) event.preventDefault();
+});
+
 const peopleForm = document.querySelector("[data-people-form]");
 const peopleBody = document.querySelector("[data-people-body]");
 const selectionToolbar = document.querySelector("[data-selection-toolbar]");

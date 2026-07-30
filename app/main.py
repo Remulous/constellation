@@ -47,6 +47,7 @@ from app.services.vetbiz_imports import (
     bulk_decide_candidates,
     commit_reviewed_import,
     create_reviewed_import,
+    delete_pending_import,
     propose_connection_suggestion,
     propose_opportunity_from_signal,
     update_candidate,
@@ -578,6 +579,11 @@ def vetbiz_imports_page(request: Request, db: Session = Depends(get_db)):
             request,
             records=records,
             max_minutes_upload_mb=settings.max_minutes_upload_mb,
+            notice=(
+                "The in-progress review and its staged proposals were deleted."
+                if request.query_params.get("deleted")
+                else ""
+            ),
         ),
     )
 
@@ -663,6 +669,25 @@ def vetbiz_import_review(
         "vetbiz_import_review.html",
         _vetbiz_import_context(request, db, record, notice=notice),
     )
+
+
+@app.post("/vetbiz-imports/{import_id}/delete")
+def delete_vetbiz_import(
+    request: Request,
+    import_id: int,
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    record = db.get(VetBizImportRecord, import_id)
+    if not record:
+        raise HTTPException(404, "Reviewed-minutes import not found")
+    try:
+        delete_pending_import(db, record)
+        db.commit()
+    except VetBizImportError as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc)) from exc
+    return RedirectResponse("/vetbiz-imports?deleted=1", status_code=303)
 
 
 @app.post("/vetbiz-imports/{import_id}/candidates/{candidate_id}")
