@@ -30,6 +30,9 @@ const selectionToolbar = document.querySelector("[data-selection-toolbar]");
 const selectionCount = document.querySelector("[data-selection-count]");
 const selectionSubmit = selectionToolbar?.querySelector("button[type='submit']");
 const selectAll = document.querySelector("[data-select-all]");
+const bulkAction = selectionToolbar?.querySelector("[data-bulk-action]");
+const bulkTag = selectionToolbar?.querySelector("[data-bulk-tag]");
+const bulkCadence = selectionToolbar?.querySelector("[data-bulk-cadence]");
 const selectedPeople = new Set();
 
 function rowCheckboxes() {
@@ -44,7 +47,19 @@ function updateSelection() {
   });
   if (selectionCount) selectionCount.textContent = String(selectedPeople.size);
   if (selectionToolbar) selectionToolbar.classList.toggle("is-active", selectedPeople.size > 0);
-  if (selectionSubmit) selectionSubmit.disabled = selectedPeople.size === 0;
+  const merging = bulkAction?.value === "merge";
+  if (bulkTag) bulkTag.hidden = bulkAction?.value !== "tag";
+  if (bulkCadence) bulkCadence.hidden = bulkAction?.value !== "cadence";
+  if (selectionSubmit) {
+    selectionSubmit.disabled = merging
+      ? selectedPeople.size !== 2
+      : selectedPeople.size === 0;
+    selectionSubmit.textContent = merging ? "Review merge" : "Apply to selected";
+    selectionSubmit.title =
+      merging && selectedPeople.size !== 2
+        ? "Select exactly two people to merge"
+        : "";
+  }
   if (selectAll) {
     const checked = checkboxes.filter((checkbox) => checkbox.checked).length;
     selectAll.checked = checkboxes.length > 0 && checked === checkboxes.length;
@@ -62,9 +77,10 @@ selectAll?.addEventListener("change", () => {
 
 peopleForm?.addEventListener("change", (event) => {
   const checkbox = event.target.closest("[data-row-select]");
-  if (!checkbox) return;
-  if (checkbox.checked) selectedPeople.add(checkbox.value);
-  else selectedPeople.delete(checkbox.value);
+  if (checkbox) {
+    if (checkbox.checked) selectedPeople.add(checkbox.value);
+    else selectedPeople.delete(checkbox.value);
+  }
   updateSelection();
 });
 updateSelection();

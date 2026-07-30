@@ -3,6 +3,7 @@
 <div class="actions">
   <a class="button quiet" href="/people">← Back to people</a>
 </div>
+{% if request.query_params.get("merged") %}<div class="notice">The selected profiles were merged. You can undo the merge from Merge review.</div>{% endif %}
 
 <section class="profile-hero">
   <div class="profile-identity">

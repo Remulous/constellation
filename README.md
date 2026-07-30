@@ -242,6 +242,8 @@ Undoing a committed reviewed-minutes import is deferred. Constellation can atomi
 
 Open **Merge review** to compare uncertain matches. Approving a merge lets you choose the surviving person and the preferred value for each scalar field. Alternate contact methods, external identities, employment, interactions, and tags are reassigned rather than discarded. A complete merge-history snapshot supports one-click undo for new merges.
 
+You can also select exactly two contacts in **People**, choose **Merge two profiles**, and review the same field-by-field comparison before merging. Manually selected merges retain the same history and one-click undo support.
+
 Legacy merge-history entries remain visible but cannot be undone automatically. Restoring a pre-merge database backup remains the recovery path for those entries.
 
 ## ChatGPT MCP connector
