@@ -177,11 +177,11 @@
         {% for field in editable_fields.get(candidate.candidate_type, [])|sort %}
           {% set value = candidate.extracted_data.get(field, "") %}
           <div class="{{ 'wide' if field in ['summary', 'notes', 'next_action', 'reason'] else '' }}">
-            <label for="{{ field }}-{{ candidate.id }}">{{ field|replace("_", " ")|title }}</label>
+            <label for="{{ field }}-{{ candidate.id }}">{{ "LinkedIn profile URL" if field == "linkedin_url" else field|replace("_", " ")|title }}</label>
             {% if field in ["summary", "notes", "next_action", "reason"] %}
               <textarea id="{{ field }}-{{ candidate.id }}" name="{{ field }}">{{ value }}</textarea>
             {% else %}
-              <input id="{{ field }}-{{ candidate.id }}" name="{{ field }}" value="{{ value }}">
+              <input id="{{ field }}-{{ candidate.id }}" name="{{ field }}" value="{{ value }}"{% if field == "linkedin_url" %} type="url" placeholder="https://linkedin.com/in/profile"{% endif %}>
             {% endif %}
           </div>
         {% endfor %}

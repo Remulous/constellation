@@ -10,6 +10,7 @@ from app.main import app
 from app.models import (
     ConnectionSuggestion,
     ContactMethod,
+    ExternalIdentity,
     Interaction,
     Opportunity,
     Organization,
@@ -59,6 +60,11 @@ def test_markdown_plain_text_and_missing_fields_parse():
     assert markdown.participants[0].last_name == "Carter"
     assert markdown.participants[0].affiliation == "'08"
     assert markdown.participants[0].email == "alex.carter@example.test"
+    assert markdown.participants[0].website == ""
+    assert (
+        markdown.participants[0].linkedin_url
+        == "https://linkedin.com/in/alex-carter-vetbiz"
+    )
     assert "WARN" in markdown.participants[0].ask
 
     plain = parse_reviewed_minutes(
@@ -67,6 +73,69 @@ def test_markdown_plain_text_and_missing_fields_parse():
     assert len(plain.participants) == 2
     assert plain.participants[1].organization == ""
     assert plain.participants[1].email == ""
+
+
+@pytest.mark.parametrize(
+    ("contact_lines", "expected_website"),
+    [
+        ("Email: avery@harbor.example", ""),
+        (
+            "Contact: avery@harbor.example; https://stone-works.example/team",
+            "https://stone-works.example/team",
+        ),
+        ("Website: www.stone-works.example", "www.stone-works.example"),
+    ],
+)
+def test_website_requires_an_explicit_url(contact_lines, expected_website):
+    parsed = parse_reviewed_minutes(
+        "minutes.txt",
+        (
+            "Fictional VetBiz Reviewed Minutes\n"
+            "July 29, 2026\n\n"
+            "Name: Avery Stone\n"
+            "Organization: Stone Works\n"
+            f"{contact_lines}\n"
+        ).encode(),
+    )
+    assert parsed.participants[0].website == expected_website
+
+
+def test_linkedin_profile_is_separate_and_matches_existing_identity(db):
+    person = Person(display_name="Avery Stone")
+    db.add(person)
+    db.flush()
+    db.add(
+        ExternalIdentity(
+            person_id=person.id,
+            provider="linkedin",
+            provider_record_id="https://linkedin.com/in/avery-stone",
+            profile_url="https://linkedin.com/in/avery-stone",
+            source_payload={},
+            record_hash="linkedin-existing",
+        )
+    )
+    db.commit()
+
+    record = create_reviewed_import(
+        db,
+        "minutes.txt",
+        (
+            "Fictional VetBiz Reviewed Minutes\n"
+            "July 29, 2026\n\n"
+            "Name: Avery Stone\n"
+            "Organization: Different Organization\n"
+            "LinkedIn: www.linkedin.com/in/avery-stone/\n"
+        ).encode(),
+        review_confirmed=True,
+    ).record
+    contact = candidate(record, "contact_update", "Avery Stone")
+    assert contact.match_reason == "exact external identifier"
+    assert contact.matched_entity_id == person.id
+    assert (
+        contact.extracted_data["linkedin_url"]
+        == "https://linkedin.com/in/avery-stone"
+    )
+    assert contact.extracted_data["website"] == ""
 
 
 @pytest.mark.parametrize(
@@ -271,11 +340,23 @@ def test_candidate_approval_rejection_and_provenance_commit(db):
     assert record.import_status == "committed"
 
     interaction = db.scalar(select(Interaction))
+    linkedin_identity = db.scalar(
+        select(ExternalIdentity).where(
+            ExternalIdentity.person_id == existing.id,
+            ExternalIdentity.provider == "linkedin",
+        )
+    )
     signal = db.scalar(select(RelationshipSignal))
     opportunity = db.scalar(select(Opportunity))
     assert interaction.source_import_id == record.id
     assert interaction.source_candidate_id == alex_interaction.id
     assert interaction.source_excerpt
+    assert (
+        linkedin_identity.profile_url
+        == "https://linkedin.com/in/alex-carter-vetbiz"
+    )
+    assert linkedin_identity.source_payload["source_import_id"] == record.id
+    assert linkedin_identity.source_payload["source_candidate_id"] == alex_contact.id
     assert signal.source_import_id == record.id
     assert opportunity.source_import_id == record.id
     assert opportunity.product == "LayoffLens"
