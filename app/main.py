@@ -40,6 +40,7 @@ from app.models import (
 from app.security import csrf_token, safe_csv_cell, verify_csrf, verify_password
 from app.services.followups import refresh_followup
 from app.services.imports import import_csv
+from app.services.normalize import normalize_linkedin_url
 from app.services.vetbiz_imports import (
     EDITABLE_FIELDS,
     VetBizImportError,
@@ -427,6 +428,79 @@ def edit_person(
     refresh_followup(person)
     db.commit()
     return RedirectResponse(f"/people/{person.id}", status_code=303)
+
+
+@app.post("/people/{person_id}/linkedin")
+def edit_person_linkedin(
+    request: Request,
+    person_id: str,
+    action: str = Form("save"),
+    linkedin_url: str = Form(""),
+    db: Session = Depends(get_db),
+    _csrf: None = Depends(require_csrf),
+):
+    person = get_person(db, person_id)
+    identities = db.scalars(
+        select(ExternalIdentity).where(ExternalIdentity.provider == "linkedin")
+    ).all()
+    person_identities = [
+        identity for identity in identities if identity.person_id == person.id
+    ]
+
+    if action == "remove":
+        for identity in person_identities:
+            identity.active = False
+        db.commit()
+        return RedirectResponse(
+            f"/people/{person.id}?linkedin=removed#linkedin-profile",
+            status_code=303,
+        )
+    if action != "save":
+        raise HTTPException(400, "Unsupported LinkedIn profile action")
+
+    normalized = normalize_linkedin_url(linkedin_url)
+    if not normalized.casefold().startswith("https://linkedin.com/in/"):
+        raise HTTPException(
+            400, "Enter a LinkedIn person profile URL using linkedin.com/in/."
+        )
+
+    matching = [
+        identity
+        for identity in identities
+        if normalize_linkedin_url(
+            identity.profile_url or identity.provider_record_id
+        )
+        == normalized
+    ]
+    if any(identity.person_id != person.id for identity in matching):
+        raise HTTPException(
+            400, "That LinkedIn profile is already attached to another person."
+        )
+
+    for identity in person_identities:
+        identity.active = False
+    identity = matching[0] if matching else None
+    if identity is None:
+        identity = ExternalIdentity(
+            person_id=person.id,
+            provider="linkedin",
+            provider_record_id=normalized,
+            profile_url=normalized,
+            source_payload={"source": "manual_profile_edit"},
+            record_hash=hashlib.sha256(
+                f"manual_profile_edit|{normalized}".encode()
+            ).hexdigest(),
+        )
+        db.add(identity)
+    else:
+        identity.profile_url = normalized
+    identity.active = True
+    identity.last_imported_at = datetime.now(timezone.utc)
+    db.commit()
+    return RedirectResponse(
+        f"/people/{person.id}?linkedin=saved#linkedin-profile",
+        status_code=303,
+    )
 
 
 @app.post("/people/{person_id}/interactions")

@@ -230,6 +230,8 @@ An in-progress review can be deleted together with all of its staged proposals. 
 
 Explicit LinkedIn person-profile URLs are reviewed separately from ordinary websites. They participate in deterministic contact matching and are stored through the existing LinkedIn external-identity model only when the contact proposal is approved and committed; the importer does not scrape LinkedIn.
 
+LinkedIn profiles can also be added, updated, or removed manually from an individual person page. Manual edits reuse the same external-identity model, normalize profile URLs, retain inactive identity history, and refuse to attach one LinkedIn profile to multiple people.
+
 Each committed result retains its import record, source excerpt, review decision, and committed entity identifier. Duplicate files are detected by checksum. A changed file with the same meeting title and date is marked as a possible revision, and matching sourced interactions or signals are reused when possible.
 
 RTF extraction treats formatting and embedded content as untrusted. Pictures and unsupported formatting are ignored, while malformed, protected, object-bearing, deeply nested, oversized, or otherwise suspicious files are rejected. Older minutes with image-only contact lists can preserve their readable text but cannot yield contact rows without OCR.

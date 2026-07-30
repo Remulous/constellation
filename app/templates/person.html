@@ -152,6 +152,24 @@
       {% endfor %}
     </section>
 
+    <section class="panel" id="linkedin-profile">
+      <div class="panel-header">
+        <div><h2>LinkedIn profile</h2><p>Add or update this person’s LinkedIn identity.</p></div>
+        <span class="metric-icon"><svg class="icon"><use href="/static/icons.svg#linkedin"></use></svg></span>
+      </div>
+      {% if request.query_params.get("linkedin") == "saved" %}<div class="notice compact">LinkedIn profile saved.</div>{% endif %}
+      {% if request.query_params.get("linkedin") == "removed" %}<div class="notice compact">LinkedIn profile removed from this person.</div>{% endif %}
+      <form method="post" action="/people/{{ person.id }}/linkedin">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="linkedin_url">Profile URL</label>
+        <input id="linkedin_url" name="linkedin_url" type="url" value="{{ person.linkedin_url or '' }}" placeholder="https://linkedin.com/in/profile">
+        <div class="actions">
+          <button type="submit" name="action" value="save">{{ "Update LinkedIn" if person.linkedin_url else "Add LinkedIn" }}</button>
+          {% if person.linkedin_url %}<button class="quiet" type="submit" name="action" value="remove">Remove</button>{% endif %}
+        </div>
+      </form>
+    </section>
+
     <section class="panel">
       <div class="panel-header"><div><h2>Sources</h2><p>Where this record came from.</p></div></div>
       {% for i in person.identities %}
