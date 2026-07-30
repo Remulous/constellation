@@ -688,7 +688,8 @@ async def decide_vetbiz_candidate(
             status_code=400,
         )
     return RedirectResponse(
-        f"/vetbiz-imports/{import_id}?saved=1", status_code=303
+        f"/vetbiz-imports/{import_id}?saved=1#candidate-{candidate_id}",
+        status_code=303,
     )
 
 
