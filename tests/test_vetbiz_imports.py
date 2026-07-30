@@ -59,6 +59,7 @@ def test_markdown_plain_text_and_missing_fields_parse():
     assert markdown.participants[0].last_name == "Carter"
     assert markdown.participants[0].affiliation == "'08"
     assert markdown.participants[0].email == "alex.carter@example.test"
+    assert markdown.participants[0].website == ""
     assert "WARN" in markdown.participants[0].ask
 
     plain = parse_reviewed_minutes(
@@ -67,6 +68,31 @@ def test_markdown_plain_text_and_missing_fields_parse():
     assert len(plain.participants) == 2
     assert plain.participants[1].organization == ""
     assert plain.participants[1].email == ""
+
+
+@pytest.mark.parametrize(
+    ("contact_lines", "expected_website"),
+    [
+        ("Email: avery@harbor.example", ""),
+        (
+            "Contact: avery@harbor.example; https://stone-works.example/team",
+            "https://stone-works.example/team",
+        ),
+        ("Website: www.stone-works.example", "www.stone-works.example"),
+    ],
+)
+def test_website_requires_an_explicit_url(contact_lines, expected_website):
+    parsed = parse_reviewed_minutes(
+        "minutes.txt",
+        (
+            "Fictional VetBiz Reviewed Minutes\n"
+            "July 29, 2026\n\n"
+            "Name: Avery Stone\n"
+            "Organization: Stone Works\n"
+            f"{contact_lines}\n"
+        ).encode(),
+    )
+    assert parsed.participants[0].website == expected_website
 
 
 @pytest.mark.parametrize(

@@ -580,14 +580,18 @@ def _extract_contact_fields(row: dict[str, str]) -> dict[str, str]:
     contact = " ".join(
         value for value in (row.get("contact", ""), row.get("email", ""), row.get("phone", ""), row.get("website", "")) if value
     )
-    email_match = re.search(r"[\w.!#$%&'*+/=?^`{|}~-]+@[\w.-]+\.[A-Za-z]{2,}", contact)
+    email_pattern = r"[\w.!#$%&'*+/=?^`{|}~-]+@[\w.-]+\.[A-Za-z]{2,}"
+    email_match = re.search(email_pattern, contact)
     phone_match = re.search(
         r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)",
         contact,
     )
+    # An email domain is not evidence of a person's or organization's website.
+    # Remove email addresses before looking for an explicitly supplied URL.
+    url_source = re.sub(email_pattern, " ", contact)
     url_match = re.search(
         r"\b(?:https?://)?(?:www\.)?[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?:/[^\s,;]*)?",
-        contact,
+        url_source,
         flags=re.IGNORECASE,
     )
     website = url_match.group(0) if url_match else row.get("website", "")
