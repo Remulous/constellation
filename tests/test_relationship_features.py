@@ -70,6 +70,77 @@ def test_google_export_and_linkedin_shortcuts(db):
         app.dependency_overrides.clear()
 
 
+def test_person_linkedin_profile_can_be_added_and_removed(db):
+    person = Person(display_name="Avery Stone")
+    other = Person(display_name="Morgan Lee")
+    db.add_all([person, other])
+    db.commit()
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        with TestClient(app, base_url="https://testserver") as client:
+            profile = client.get(f"/people/{person.id}")
+            token = csrf_token(profile.text)
+            assert "Add LinkedIn" in profile.text
+
+            invalid = client.post(
+                f"/people/{person.id}/linkedin",
+                data={
+                    "csrf_token": token,
+                    "action": "save",
+                    "linkedin_url": "https://example.com/avery",
+                },
+            )
+            assert invalid.status_code == 400
+
+            added = client.post(
+                f"/people/{person.id}/linkedin",
+                data={
+                    "csrf_token": token,
+                    "action": "save",
+                    "linkedin_url": "www.linkedin.com/in/avery-stone/",
+                },
+                follow_redirects=False,
+            )
+            assert added.status_code == 303
+            assert added.headers["location"].endswith(
+                "?linkedin=saved#linkedin-profile"
+            )
+            db.expire_all()
+            identity = db.scalar(
+                select(ExternalIdentity).where(
+                    ExternalIdentity.person_id == person.id,
+                    ExternalIdentity.provider == "linkedin",
+                )
+            )
+            assert identity.profile_url == "https://linkedin.com/in/avery-stone"
+            assert identity.source_payload["source"] == "manual_profile_edit"
+            assert identity.active is True
+
+            duplicate = client.post(
+                f"/people/{other.id}/linkedin",
+                data={
+                    "csrf_token": token,
+                    "action": "save",
+                    "linkedin_url": "https://linkedin.com/in/avery-stone",
+                },
+            )
+            assert duplicate.status_code == 400
+
+            removed = client.post(
+                f"/people/{person.id}/linkedin",
+                data={"csrf_token": token, "action": "remove"},
+                follow_redirects=False,
+            )
+            assert removed.status_code == 303
+            assert removed.headers["location"].endswith(
+                "?linkedin=removed#linkedin-profile"
+            )
+            db.expire_all()
+            assert db.get(ExternalIdentity, identity.id).active is False
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_today_meeting_brief_and_data_quality(db):
     today = date.today()
     due = Person(
