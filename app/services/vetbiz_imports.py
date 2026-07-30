@@ -101,6 +101,12 @@ HEADER_ALIASES = {
     "email": {"email", "email address"},
     "phone": {"phone", "telephone", "mobile"},
     "website": {"website", "url"},
+    "linkedin_url": {
+        "linkedin",
+        "linkedin url",
+        "linkedin profile",
+        "linkedin profile url",
+    },
     "affiliation": {
         "affiliation",
         "class year",
@@ -131,6 +137,7 @@ EDITABLE_FIELDS = {
         "title",
         "affiliation",
         "website",
+        "linkedin_url",
     },
     "contact_update": {
         "display_name",
@@ -142,6 +149,7 @@ EDITABLE_FIELDS = {
         "title",
         "affiliation",
         "website",
+        "linkedin_url",
     },
     "organization": {"name", "website", "notes"},
     "interaction": {"summary"},
@@ -215,6 +223,7 @@ class ParsedParticipant:
     email: str = ""
     phone: str = ""
     website: str = ""
+    linkedin_url: str = ""
     affiliation: str = ""
     offer: str = ""
     ask: str = ""
@@ -578,7 +587,15 @@ def _labeled_rows(text: str) -> list[dict[str, str]]:
 
 def _extract_contact_fields(row: dict[str, str]) -> dict[str, str]:
     contact = " ".join(
-        value for value in (row.get("contact", ""), row.get("email", ""), row.get("phone", ""), row.get("website", "")) if value
+        value
+        for value in (
+            row.get("contact", ""),
+            row.get("email", ""),
+            row.get("phone", ""),
+            row.get("website", ""),
+            row.get("linkedin_url", ""),
+        )
+        if value
     )
     email_pattern = r"[\w.!#$%&'*+/=?^`{|}~-]+@[\w.-]+\.[A-Za-z]{2,}"
     email_match = re.search(email_pattern, contact)
@@ -589,18 +606,24 @@ def _extract_contact_fields(row: dict[str, str]) -> dict[str, str]:
     # An email domain is not evidence of a person's or organization's website.
     # Remove email addresses before looking for an explicitly supplied URL.
     url_source = re.sub(email_pattern, " ", contact)
-    url_match = re.search(
+    url_matches = re.findall(
         r"\b(?:https?://)?(?:www\.)?[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?:/[^\s,;]*)?",
         url_source,
         flags=re.IGNORECASE,
     )
-    website = url_match.group(0) if url_match else row.get("website", "")
-    if website.casefold().rstrip("/") in {"linkedin.com", "www.linkedin.com"}:
-        website = ""
+    website = ""
+    linkedin_url = ""
+    for url in url_matches:
+        normalized_linkedin = normalize_linkedin_url(url)
+        if normalized_linkedin.casefold().startswith("https://linkedin.com/in/"):
+            linkedin_url = linkedin_url or normalized_linkedin
+        elif "linkedin.com" not in normalized_linkedin.casefold():
+            website = website or url
     return {
         "email": email_match.group(0) if email_match else _clean_text(row.get("email", ""), 320),
         "phone": phone_match.group(0) if phone_match else _clean_text(row.get("phone", ""), 80),
         "website": _clean_text(website, 500),
+        "linkedin_url": _clean_text(linkedin_url, 500),
     }
 
 
@@ -639,6 +662,7 @@ def _participant_from_row(row: dict[str, str]) -> ParsedParticipant | None:
         email=contact["email"],
         phone=contact["phone"],
         website=contact["website"],
+        linkedin_url=contact["linkedin_url"],
         affiliation=_clean_text(row.get("affiliation", "") or inferred_affiliation, 120),
         offer=_clean_text(row.get("offer", "")),
         ask=_clean_text(row.get("ask", "") or notes_ask),
@@ -714,11 +738,15 @@ def _match_person(
         if len(people) > 1:
             return None, "ambiguous exact email", 0.65, _person_options(people, "exact email")
 
-    linkedin_url = normalize_linkedin_url(participant.website)
+    linkedin_url = normalize_linkedin_url(participant.linkedin_url)
     if linkedin_url and "linkedin.com/in/" in linkedin_url.casefold():
         identities = db.scalars(
             select(ExternalIdentity).where(
-                ExternalIdentity.profile_url == linkedin_url
+                (ExternalIdentity.profile_url == linkedin_url)
+                | (
+                    (ExternalIdentity.provider == "linkedin")
+                    & (ExternalIdentity.provider_record_id == linkedin_url)
+                )
             )
         ).all()
         people = [db.get(Person, identity.person_id) for identity in identities]
@@ -973,6 +1001,7 @@ def create_reviewed_import(
             "organization": participant.organization,
             "title": participant.title,
             "website": participant.website,
+            "linkedin_url": participant.linkedin_url,
             "affiliation": participant.affiliation,
             "match_options": match_options,
         }
@@ -1370,6 +1399,59 @@ def _add_contact_method(
     )
 
 
+def _add_linkedin_identity(
+    db: Session,
+    person: Person,
+    profile_url: str,
+    record: VetBizImportRecord,
+    candidate: VetBizImportCandidate,
+) -> None:
+    if not profile_url:
+        return
+    normalized = normalize_linkedin_url(profile_url)
+    if not normalized.casefold().startswith(
+        "https://linkedin.com/in/"
+    ):
+        raise VetBizImportError(
+            "LinkedIn profile information must use a linkedin.com/in profile URL."
+        )
+
+    identities = db.scalars(
+        select(ExternalIdentity).where(
+            (ExternalIdentity.profile_url == normalized)
+            | (
+                (ExternalIdentity.provider == "linkedin")
+                & (ExternalIdentity.provider_record_id == normalized)
+            )
+        )
+    ).all()
+    if any(identity.person_id != person.id for identity in identities):
+        raise VetBizImportError(
+            "The approved LinkedIn profile is already attached to another contact."
+        )
+    if identities:
+        identities[0].active = True
+        return
+
+    db.add(
+        ExternalIdentity(
+            person_id=person.id,
+            provider="linkedin",
+            provider_record_id=normalized,
+            profile_url=normalized,
+            source_payload={
+                "source": SOURCE_TYPE,
+                "source_import_id": record.id,
+                "source_candidate_id": candidate.id,
+            },
+            record_hash=hashlib.sha256(
+                f"{SOURCE_TYPE}|{normalized}".encode()
+            ).hexdigest(),
+            active=True,
+        )
+    )
+
+
 def _mark_committed(
     candidate: VetBizImportCandidate, entity_type: str, entity_id: str | int | None
 ) -> None:
@@ -1435,6 +1517,13 @@ def commit_reviewed_import(db: Session, record: VetBizImportRecord) -> dict[str,
                 person.current_title = person.current_title or data.get("title") or None
             _add_contact_method(person, "email", data.get("email", ""))
             _add_contact_method(person, "phone", data.get("phone", ""))
+            _add_linkedin_identity(
+                db,
+                person,
+                data.get("linkedin_url", ""),
+                record,
+                candidate,
+            )
             people_by_key[data.get("contact_key", "")] = person
             _mark_committed(candidate, "person", person.id)
             counts["contacts"] = counts.get("contacts", 0) + 1
