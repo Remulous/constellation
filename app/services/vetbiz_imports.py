@@ -88,19 +88,32 @@ REJECTED_RTF_CONTROLS = {
 }
 
 HEADER_ALIASES = {
-    "name": {"name", "participant", "participant name", "member", "attendee"},
+    "name": {
+        "name",
+        "participant",
+        "participant name",
+        "participant / class or affiliation",
+        "member",
+        "attendee",
+    },
     "organization": {
         "organization",
         "business",
         "company",
         "business / organization",
         "business or organization",
+        "organization / role",
     },
     "title": {"title", "position", "role"},
-    "contact": {"contact", "contact information", "contact info"},
+    "contact": {
+        "contact",
+        "contact information",
+        "contact info",
+        "other relevant contact",
+    },
     "email": {"email", "email address"},
     "phone": {"phone", "telephone", "mobile"},
-    "website": {"website", "url"},
+    "website": {"website", "url", "linkedin / website"},
     "linkedin_url": {
         "linkedin",
         "linkedin url",
@@ -451,6 +464,20 @@ def _parse_date(value: str) -> date | None:
 
 
 def _find_meeting_date(text: str) -> date | None:
+    date_value = (
+        r"(?:January|February|March|April|May|June|July|August|September|October|"
+        r"November|December)\s+\d{1,2},?\s+\d{4}"
+        r"|\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|"
+        r"October|November|December),?\s+\d{4}"
+        r"|\d{1,2}/\d{1,2}/\d{4}"
+        r"|\d{4}-\d{2}-\d{2}"
+    )
+    labeled = re.search(
+        rf"(?im)^[ \t]*(?:meeting\s+)?date\s*:[ \t]*(?:\n[ \t]*)+({date_value})",
+        text,
+    )
+    if labeled and (parsed := _parse_date(labeled.group(1))):
+        return parsed
     patterns = (
         r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b",
         r"\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December),?\s+\d{4}\b",
@@ -506,6 +533,67 @@ def _markdown_rows(text: str) -> list[dict[str, str]]:
 
 def _tabular_rows(text: str) -> list[dict[str, str]]:
     lines = text.splitlines()
+
+    # Some RTF writers emit every table cell as its own paragraph. The text
+    # extractor preserves the cell boundary as a trailing tab and the row
+    # boundary as a blank line, producing a vertical rather than horizontal
+    # table. Reassemble those groups before trying the conventional tab layout.
+    groups = re.split(r"\n\s*\n+", text)
+
+    def vertical_cells(group: str) -> list[str]:
+        if "\t" not in group:
+            return []
+        cells: list[str] = []
+        pending: list[str] = []
+        for group_line in group.splitlines():
+            parts = group_line.split("\t")
+            pending.append(parts[0])
+            for part in parts[1:]:
+                cells.append(_clean_text(" ".join(pending)))
+                pending = [part] if part else []
+        if pending and any(value.strip() for value in pending):
+            cells.append(_clean_text(" ".join(pending)))
+        return cells
+
+    for group_index, group in enumerate(groups):
+        headers = [_canonical_header(cell) for cell in vertical_cells(group)]
+        if "name" not in headers or len(headers) < 2:
+            continue
+        if not any(
+            header in headers
+            for header in (
+                "organization",
+                "contact",
+                "email",
+                "website",
+                "ask",
+                "notes_ask",
+                "offer",
+            )
+        ):
+            continue
+        rows: list[dict[str, str]] = []
+        for candidate_group in groups[group_index + 1:]:
+            candidate_cells = vertical_cells(candidate_group)
+            if not candidate_cells:
+                if rows:
+                    break
+                continue
+            if len(candidate_cells) != len(headers):
+                if rows:
+                    break
+                continue
+            candidate_headers = [_canonical_header(cell) for cell in candidate_cells]
+            if candidate_headers == headers:
+                continue
+            candidate_cells = [
+                "" if cell.casefold() in {"not provided", "n/a", "none"} else cell
+                for cell in candidate_cells
+            ]
+            rows.append(dict(zip(headers, candidate_cells)))
+        if rows:
+            return rows
+
     for index, line in enumerate(lines):
         cells = [_clean_text(cell) for cell in line.split("\t")]
         while cells and not cells[-1]:
@@ -629,20 +717,29 @@ def _extract_contact_fields(row: dict[str, str]) -> dict[str, str]:
 
 def _split_name_affiliation(value: str) -> tuple[str, str]:
     value = _clean_text(value, 300)
+    segments = [segment.strip() for segment in value.split(";")]
+    name_and_year = segments[0]
+    additional_affiliation = "; ".join(
+        segment for segment in segments[1:] if segment
+    )
     match = re.match(
         r"^(.*?)(?:,\s*)?(?:\(\s*)?"
         r"((?:USNA|USMA|USMMA|USAFA|USCGA)\s*)?"
         r"(?:[‘’'`](\d{2})|(?:class\s+of\s+)?((?:19|20)\d{2}))"
         r"(?:\s*\))?$",
-        value,
+        name_and_year,
         flags=re.IGNORECASE,
     )
     if not match:
-        return value, ""
+        return name_and_year, additional_affiliation
     name = match.group(1).rstrip(" ,")
     academy = (match.group(2) or "").strip().upper()
     class_year = f"'{match.group(3)}" if match.group(3) else match.group(4)
-    affiliation = f"{academy} {class_year}".strip()
+    affiliation = "; ".join(
+        value
+        for value in (f"{academy} {class_year}".strip(), additional_affiliation)
+        if value
+    )
     return name, affiliation
 
 

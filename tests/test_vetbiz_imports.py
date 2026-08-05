@@ -181,6 +181,49 @@ def test_rtf_parser_preserves_tables_and_ignores_unsupported_formatting():
     assert "manufacturing consulting" in parsed.participants[0].offer
 
 
+def test_rtf_parser_handles_vertical_roster_cells_and_prefers_labeled_date():
+    data = br"""{\rtf1\ansi
+VetBiz Meeting Recap\par
+USNA Hampton Roads | August 2026 | Working draft for human review\par
+Next VetBiz meeting: September 2, 2026\par
+Participant / Class or Affiliation\cell
+Organization / Role\cell
+Email\cell
+LinkedIn / Website\cell
+Other Relevant Contact\cell\row
+David Duffie '75; submarine veteran\cell
+Training Modernization Group; Alumni Association representative\cell
+duffieda@example.test\cell
+Not provided\cell
+401-369-5823\cell\row
+Tara \b  Feher\b0  '03; former helicopter pilot\cell
+Psionic; Blue and Gold Officer\cell
+Not provided\cell
+https://www.linkedin.com/in/tara-feher/\cell
+Not provided\cell\row
+Date:\par
+August 5, 2026 (verify before distribution)\par
+}"""
+
+    parsed = parse_reviewed_minutes("working-notes.rtf", data)
+
+    assert parsed.meeting_date.isoformat() == "2026-08-05"
+    assert [participant.display_name for participant in parsed.participants] == [
+        "David Duffie",
+        "Tara Feher",
+    ]
+    assert parsed.participants[0].affiliation == "'75; submarine veteran"
+    assert parsed.participants[0].phone == "401-369-5823"
+    assert parsed.participants[0].website == ""
+    assert parsed.participants[1].last_name == "Feher"
+    assert parsed.participants[1].affiliation == "'03; former helicopter pilot"
+    assert parsed.participants[1].email == ""
+    assert (
+        parsed.participants[1].linkedin_url
+        == "https://linkedin.com/in/tara-feher"
+    )
+
+
 @pytest.mark.parametrize(
     "payload",
     [
