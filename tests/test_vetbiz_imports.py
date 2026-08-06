@@ -20,6 +20,7 @@ from app.models import (
     VetBizImportRecord,
 )
 from app.services.vetbiz_imports import (
+    FALLBACK_INTERACTION_SUMMARY,
     VetBizImportError,
     bulk_decide_candidates,
     commit_reviewed_import,
@@ -29,6 +30,7 @@ from app.services.vetbiz_imports import (
     parse_reviewed_minutes,
     propose_connection_suggestion,
     propose_opportunity_from_signal,
+    repair_committed_interaction_summaries,
     update_candidate,
 )
 
@@ -201,6 +203,27 @@ Psionic; Blue and Gold Officer\cell
 Not provided\cell
 https://www.linkedin.com/in/tara-feher/\cell
 Not provided\cell\row
+Person / Organization\cell
+Background or Offering\cell
+Ask, Offer, Resource, or Question\cell
+Connection Opportunity / Who Might Help\cell
+Follow-Up or Action\cell
+Owner\cell
+Timing\cell\row
+David Duffie / Training Modernization Group\cell
+Described a no-cost defense-contractor talent pipeline.\cell
+Resource: talent acquisition and retention support.\cell
+Defense contractors that need experienced candidates.\cell
+Confirm the program name with David.\cell
+John Remy\cell
+Next week\cell\row
+Tara Feher / Psionic\cell
+Supports military-connected technical teams.\cell
+Ask: introductions to veteran-owned technology companies.\cell
+Veteran founders in Hampton Roads.\cell
+Send Tara the chapter contact list.\cell
+Mark Zito\cell
+August 2026\cell\row
 Date:\par
 August 5, 2026 (verify before distribution)\par
 }"""
@@ -215,13 +238,84 @@ August 5, 2026 (verify before distribution)\par
     assert parsed.participants[0].affiliation == "'75; submarine veteran"
     assert parsed.participants[0].phone == "401-369-5823"
     assert parsed.participants[0].website == ""
+    assert "no-cost defense-contractor talent pipeline" in parsed.participants[0].notes
+    assert parsed.participants[0].follow_up.startswith(
+        "Confirm the program name with David."
+    )
     assert parsed.participants[1].last_name == "Feher"
     assert parsed.participants[1].affiliation == "'03; former helicopter pilot"
     assert parsed.participants[1].email == ""
+    assert "introductions to veteran-owned technology companies" in (
+        parsed.participants[1].notes
+    )
     assert (
         parsed.participants[1].linkedin_url
         == "https://linkedin.com/in/tara-feher"
     )
+
+
+def test_committed_fallback_interactions_can_be_repaired_without_overwriting_edits(db):
+    data = br"""{\rtf1\ansi
+VetBiz Meeting Recap\par
+Participant / Class or Affiliation\cell
+Organization / Role\cell
+Email\cell
+LinkedIn / Website\cell
+Other Relevant Contact\cell\row
+David Duffie '75\cell
+Training Modernization Group\cell
+duffieda@example.test\cell
+Not provided\cell
+401-369-5823\cell\row
+Person / Organization\cell
+Background or Offering\cell
+Ask, Offer, Resource, or Question\cell
+Connection Opportunity / Who Might Help\cell
+Follow-Up or Action\cell
+Owner\cell
+Timing\cell\row
+David Duffie / Training Modernization Group\cell
+Described a no-cost defense-contractor talent pipeline.\cell
+Resource: talent acquisition and retention support.\cell
+Defense contractors that need experienced candidates.\cell
+Confirm the program name with David.\cell
+John Remy\cell
+Next week\cell\row
+Date:\par
+August 5, 2026\par
+}"""
+    record = create_reviewed_import(
+        db, "working-notes.rtf", data, review_confirmed=True
+    ).record
+    contact = candidate(record, "new_contact", "David Duffie")
+    interaction_candidate = candidate(record, "interaction")
+    interaction_candidate.extracted_data = {
+        **interaction_candidate.extracted_data,
+        "summary": FALLBACK_INTERACTION_SUMMARY,
+    }
+    update_candidate(contact, "approve", {})
+    update_candidate(interaction_candidate, "approve", {})
+    db.commit()
+    commit_reviewed_import(db, record)
+
+    interaction = db.scalar(select(Interaction))
+    assert interaction.summary == FALLBACK_INTERACTION_SUMMARY
+    counts = repair_committed_interaction_summaries(
+        db, record, "working-notes.rtf", data
+    )
+    db.commit()
+
+    assert counts == {"updated": 1, "skipped_modified": 0, "missing_details": 0}
+    assert "no-cost defense-contractor talent pipeline" in interaction.summary
+    assert interaction_candidate.extracted_data["summary"] == interaction.summary
+
+    interaction.summary = "John's manually corrected note."
+    db.commit()
+    counts = repair_committed_interaction_summaries(
+        db, record, "working-notes.rtf", data
+    )
+    assert counts["skipped_modified"] == 1
+    assert interaction.summary == "John's manually corrected note."
 
 
 @pytest.mark.parametrize(

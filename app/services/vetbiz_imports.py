@@ -34,6 +34,7 @@ from app.services.normalize import (
 
 
 SOURCE_TYPE = "vetbiz_reviewed_minutes"
+FALLBACK_INTERACTION_SUMMARY = "Attended the reviewed VetBiz meeting."
 ALLOWED_EXTENSIONS = {".md", ".markdown", ".txt", ".rtf"}
 MAX_EXTRACTED_TEXT = 2_000_000
 MAX_RTF_DEPTH = 256
@@ -93,6 +94,7 @@ HEADER_ALIASES = {
         "participant",
         "participant name",
         "participant / class or affiliation",
+        "person / organization",
         "member",
         "attendee",
     },
@@ -130,13 +132,25 @@ HEADER_ALIASES = {
     "ask": {"ask", "asks", "need", "needs", "looking for"},
     "notes_ask": {"notes / ask", "notes and ask", "notes / needs"},
     "notes": {"notes", "summary", "update", "comments"},
+    "background": {"background", "background or offering"},
+    "context": {
+        "ask, offer, resource, or question",
+        "ask / offer / resource / question",
+    },
+    "connection": {
+        "connection opportunity",
+        "connection opportunity / who might help",
+    },
     "follow_up": {
         "follow-up",
         "follow up",
         "follow-up notes",
         "next action",
         "action",
+        "follow-up or action",
     },
+    "owner": {"owner"},
+    "timing": {"timing"},
 }
 
 EDITABLE_FIELDS = {
@@ -531,32 +545,32 @@ def _markdown_rows(text: str) -> list[dict[str, str]]:
     return []
 
 
-def _tabular_rows(text: str) -> list[dict[str, str]]:
-    lines = text.splitlines()
+def _vertical_cells(group: str) -> list[str]:
+    if "\t" not in group:
+        return []
+    cells: list[str] = []
+    pending: list[str] = []
+    for group_line in group.splitlines():
+        parts = group_line.split("\t")
+        pending.append(parts[0])
+        for part in parts[1:]:
+            cells.append(_clean_text(" ".join(pending)))
+            pending = [part] if part else []
+    if pending and any(value.strip() for value in pending):
+        cells.append(_clean_text(" ".join(pending)))
+    return cells
 
+
+def _vertical_tables(text: str) -> list[list[dict[str, str]]]:
     # Some RTF writers emit every table cell as its own paragraph. The text
     # extractor preserves the cell boundary as a trailing tab and the row
     # boundary as a blank line, producing a vertical rather than horizontal
-    # table. Reassemble those groups before trying the conventional tab layout.
+    # table. Reassemble every recognized table so later context tables can be
+    # joined back to the primary participant roster.
     groups = re.split(r"\n\s*\n+", text)
-
-    def vertical_cells(group: str) -> list[str]:
-        if "\t" not in group:
-            return []
-        cells: list[str] = []
-        pending: list[str] = []
-        for group_line in group.splitlines():
-            parts = group_line.split("\t")
-            pending.append(parts[0])
-            for part in parts[1:]:
-                cells.append(_clean_text(" ".join(pending)))
-                pending = [part] if part else []
-        if pending and any(value.strip() for value in pending):
-            cells.append(_clean_text(" ".join(pending)))
-        return cells
-
+    tables: list[list[dict[str, str]]] = []
     for group_index, group in enumerate(groups):
-        headers = [_canonical_header(cell) for cell in vertical_cells(group)]
+        headers = [_canonical_header(cell) for cell in _vertical_cells(group)]
         if "name" not in headers or len(headers) < 2:
             continue
         if not any(
@@ -569,12 +583,16 @@ def _tabular_rows(text: str) -> list[dict[str, str]]:
                 "ask",
                 "notes_ask",
                 "offer",
+                "background",
+                "context",
+                "connection",
+                "follow_up",
             )
         ):
             continue
         rows: list[dict[str, str]] = []
         for candidate_group in groups[group_index + 1:]:
-            candidate_cells = vertical_cells(candidate_group)
+            candidate_cells = _vertical_cells(candidate_group)
             if not candidate_cells:
                 if rows:
                     break
@@ -592,7 +610,16 @@ def _tabular_rows(text: str) -> list[dict[str, str]]:
             ]
             rows.append(dict(zip(headers, candidate_cells)))
         if rows:
-            return rows
+            tables.append(rows)
+    return tables
+
+
+def _tabular_rows(text: str) -> list[dict[str, str]]:
+    vertical_tables = _vertical_tables(text)
+    if vertical_tables:
+        return vertical_tables[0]
+
+    lines = text.splitlines()
 
     for index, line in enumerate(lines):
         cells = [_clean_text(cell) for cell in line.split("\t")]
@@ -780,6 +807,103 @@ def _participant_from_row(row: dict[str, str]) -> ParsedParticipant | None:
     return participant
 
 
+def _enrich_participants(
+    participants: list[ParsedParticipant],
+    supplemental_tables: list[list[dict[str, str]]],
+) -> None:
+    for table in supplemental_tables:
+        for row in table:
+            row_name = normalize_name(row.get("name", ""))
+            if not row_name:
+                continue
+            for participant in participants:
+                participant_name = normalize_name(participant.display_name)
+                if not participant_name or (
+                    f" {participant_name} " not in f" {row_name} "
+                ):
+                    continue
+
+                background = _clean_text(row.get("background", ""))
+                context_value = _clean_text(row.get("context", ""))
+                connection = _clean_text(row.get("connection", ""))
+                follow_up = _clean_text(row.get("follow_up", ""))
+                owner = _clean_text(row.get("owner", ""), 200)
+                timing = _clean_text(row.get("timing", ""), 300)
+                details = [
+                    f"Background/offer: {background}" if background else "",
+                    (
+                        f"Ask/offer/resource: {context_value}"
+                        if context_value
+                        else ""
+                    ),
+                    (
+                        f"Connection opportunity: {connection}"
+                        if connection
+                        else ""
+                    ),
+                    f"Follow-up: {follow_up}" if follow_up else "",
+                    (
+                        f"Owner: {owner}"
+                        if owner and owner.casefold() != "unassigned"
+                        else ""
+                    ),
+                    (
+                        f"Timing: {timing}"
+                        if timing and timing.casefold() != "not stated"
+                        else ""
+                    ),
+                ]
+                supplemental_note = " ".join(value for value in details if value)
+                participant.notes = _clean_text(
+                    " ".join(
+                        value
+                        for value in (participant.notes, supplemental_note)
+                        if value
+                    )
+                )
+                if context_value:
+                    lowered = context_value.casefold()
+                    if re.search(r"\b(?:ask|need|seeking|request)", lowered):
+                        participant.ask = _clean_text(
+                            " ".join(
+                                value
+                                for value in (participant.ask, context_value)
+                                if value
+                            )
+                        )
+                    if re.search(r"\b(?:offer|resource|provide|support)", lowered):
+                        participant.offer = _clean_text(
+                            " ".join(
+                                value
+                                for value in (participant.offer, context_value)
+                                if value
+                            )
+                        )
+                participant.follow_up = _clean_text(
+                    " ".join(
+                        value
+                        for value in (
+                            participant.follow_up,
+                            follow_up,
+                            f"Owner: {owner}" if owner else "",
+                            f"Timing: {timing}" if timing else "",
+                        )
+                        if value
+                    )
+                )
+                participant.source_excerpt = _clean_text(
+                    " | ".join(
+                        value
+                        for value in (
+                            participant.source_excerpt,
+                            *(cell for cell in row.values() if cell),
+                        )
+                        if value
+                    ),
+                    2_000,
+                )
+
+
 def parse_reviewed_minutes(filename: str, data: bytes) -> ParsedMinutes:
     extension = Path(filename).suffix.casefold()
     if extension not in ALLOWED_EXTENSIONS:
@@ -797,12 +921,21 @@ def parse_reviewed_minutes(filename: str, data: bytes) -> ParsedMinutes:
         raise VetBizImportError(
             "A meeting date could not be found. Add a reviewed meeting date to the document."
         )
-    rows = _markdown_rows(raw_text) or _tabular_rows(raw_text) or _labeled_rows(raw_text)
+    markdown_rows = _markdown_rows(raw_text)
+    vertical_tables = _vertical_tables(raw_text) if not markdown_rows else []
+    rows = (
+        markdown_rows
+        or (vertical_tables[0] if vertical_tables else [])
+        or _tabular_rows(raw_text)
+        or _labeled_rows(raw_text)
+    )
     participants = [
         participant
         for row in rows
         if (participant := _participant_from_row(row)) is not None
     ]
+    if len(vertical_tables) > 1:
+        _enrich_participants(participants, vertical_tables[1:])
     return ParsedMinutes(
         meeting_title=_find_title(raw_text),
         meeting_date=meeting_date,
@@ -1134,7 +1267,9 @@ def create_reviewed_import(
                 "exact normalized organization" if existing_org else "new organization",
             )
 
-        interaction_summary = participant.notes or participant.ask or "Attended the reviewed VetBiz meeting."
+        interaction_summary = (
+            participant.notes or participant.ask or FALLBACK_INTERACTION_SUMMARY
+        )
         _add_candidate(
             record,
             "interaction",
@@ -1258,6 +1393,72 @@ def create_reviewed_import(
         record=record,
         revision_warning=record.revision_of_id is not None,
     )
+
+
+def repair_committed_interaction_summaries(
+    db: Session,
+    record: VetBizImportRecord,
+    filename: str,
+    data: bytes,
+) -> dict[str, int]:
+    if record.import_status != "committed":
+        raise VetBizImportError("Only a committed import can be repaired.")
+    if hashlib.sha256(data).hexdigest() != record.checksum:
+        raise VetBizImportError(
+            "The repair source does not match the committed import checksum."
+        )
+
+    parsed = parse_reviewed_minutes(filename, data)
+    parsed_by_key = {participant.contact_key: participant for participant in parsed.participants}
+    counts = {"updated": 0, "skipped_modified": 0, "missing_details": 0}
+    interaction_candidates = [
+        candidate
+        for candidate in record.candidates
+        if candidate.candidate_type == "interaction"
+        and candidate.committed_entity_type == "interaction"
+    ]
+    for candidate in interaction_candidates:
+        participant = parsed_by_key.get(candidate.extracted_data.get("contact_key", ""))
+        repaired_summary = (
+            participant.notes or participant.ask or FALLBACK_INTERACTION_SUMMARY
+            if participant
+            else FALLBACK_INTERACTION_SUMMARY
+        )
+        if repaired_summary == FALLBACK_INTERACTION_SUMMARY:
+            counts["missing_details"] += 1
+            continue
+        interaction = (
+            db.get(Interaction, int(candidate.committed_entity_id))
+            if candidate.committed_entity_id
+            else None
+        )
+        if interaction is None:
+            interaction = db.scalar(
+                select(Interaction).where(Interaction.source_candidate_id == candidate.id)
+            )
+        candidate_summary = candidate.extracted_data.get("summary")
+        if (
+            interaction is None
+            or candidate_summary != FALLBACK_INTERACTION_SUMMARY
+            or interaction.summary != FALLBACK_INTERACTION_SUMMARY
+        ):
+            counts["skipped_modified"] += 1
+            continue
+
+        candidate.extracted_data = {
+            **candidate.extracted_data,
+            "summary": repaired_summary,
+        }
+        candidate.source_excerpt = participant.source_excerpt
+        candidate.resolution_notes = (
+            "Repaired from the matching reviewed-minutes source after supplemental "
+            "RTF table parsing was added."
+        )
+        interaction.summary = repaired_summary
+        interaction.source_excerpt = participant.source_excerpt
+        counts["updated"] += 1
+    db.flush()
+    return counts
 
 
 def update_candidate(
@@ -1664,7 +1865,10 @@ def commit_reviewed_import(db: Session, record: VetBizImportRecord) -> dict[str,
                 raise VetBizImportError(
                     "Approve or select the related contact before committing an interaction."
                 )
-            summary = candidate.extracted_data.get("summary") or "Attended the reviewed VetBiz meeting."
+            summary = (
+                candidate.extracted_data.get("summary")
+                or FALLBACK_INTERACTION_SUMMARY
+            )
             interaction = db.scalar(
                 select(Interaction).where(
                     Interaction.person_id == person.id,
